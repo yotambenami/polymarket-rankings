@@ -970,6 +970,12 @@
           enriched[idx].lastActivityTs = result.value.lastActivityTs;
           enriched[idx].daysSinceActive = result.value.daysSinceActive;
           enriched[idx].activePositions = result.value.activePositions;
+          // Use computed PnL from actual positions if available (more accurate than leaderboard API)
+          if (result.value.positionsPnl !== 0) {
+            enriched[idx].leaderboardPnl = enriched[idx].pnl;
+            enriched[idx].pnl = result.value.positionsPnl;
+            enriched[idx].roi = enriched[idx].vol > 0 ? (enriched[idx].pnl / enriched[idx].vol) * 100 : 0;
+          }
         } else {
           enriched[idx].marketsWon = 0;
           enriched[idx].marketsLost = 0;
@@ -1395,7 +1401,9 @@
 
       const verified = t.verifiedBadge ? '<span class="verified-badge" title="Verified">&#10004;</span>' : '';
 
-      const profileUrl = t.proxyWallet
+      const profileUrl = t.userName
+        ? `https://polymarket.com/@${t.userName}`
+        : t.proxyWallet
         ? `https://polymarket.com/profile/${t.proxyWallet}`
         : '#';
 
