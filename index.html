@@ -696,8 +696,8 @@
 
   <div class="filter-slider-group">
     <label>Active within</label>
-    <input type="range" id="activeWithinSlider" min="7" max="365" value="30" step="7">
-    <span class="slider-value" id="activeWithinValue">30d</span>
+    <input type="range" id="activeWithinSlider" min="7" max="365" value="365" step="7">
+    <span class="slider-value" id="activeWithinValue">365d</span>
   </div>
 
   <input type="text" class="search-box" id="searchBox" placeholder="Search trader name...">
@@ -803,9 +803,10 @@
   let currentCategory = 'OVERALL';
   let currentSort = 'pnl';
   let minTrades = 0;
-  let activeWithinDays = 30;  // only show accounts active within this many days
+  let activeWithinDays = 365;  // only show accounts active within this many days
   let comboSortMetrics = [];  // ordered list of metrics for combined ranking
-  let profileCache = new Map();
+  let profileCache = new Map();  // key = "address|timePeriod"
+  let lastEnrichedPeriod = null;  // track which period was last enriched
 
   // --- Formatting helpers ---
   function formatUSD(val) {
@@ -927,19 +928,33 @@
     return resp.json();
   }
 
-  // Calculate win % by fetching both active positions and closed positions
-  // Active positions: /positions?user=ADDRESS (have cashPnl)
-  // Closed positions: /closed-positions?user=ADDRESS (have realizedPnl)
-  async function getTraderWinStats(address) {
+  // Get cutoff timestamp based on selected time period
+  function getPeriodCutoffTs(period) {
+    const now = Date.now() / 1000;
+    switch (period) {
+      case 'DAY': return now - 86400;
+      case 'WEEK': return now - 7 * 86400;
+      case 'MONTH': return now - 30 * 86400;
+      case 'ALL': default: return 0;
+    }
+  }
+
+  // Calculate win stats filtered by time period
+  // Active positions are always counted (they're current).
+  // Closed positions are filtered by the cutoff timestamp.
+  async function getTraderWinStats(address, timePeriod) {
     if (!address) return null;
-    if (profileCache.has(address)) return profileCache.get(address);
+    const cacheKey = address + '|' + timePeriod;
+    if (profileCache.has(cacheKey)) return profileCache.get(cacheKey);
+
+    const cutoffTs = getPeriodCutoffTs(timePeriod);
 
     try {
-      let wins = 0, losses = 0, totalPnl = 0;
+      let wins = 0, losses = 0, periodPnl = 0;
       let lastActivityTs = 0;
       let activeCount = 0;
 
-      // Fetch active positions
+      // Fetch active positions (always within any period since they're current)
       const activeResp = await fetch(`${API_BASE}/positions?user=${address}&sizeThreshold=0&limit=200`).catch(() => null);
       if (activeResp && activeResp.ok) {
         const active = await activeResp.json();
@@ -949,32 +964,38 @@
             const pnl = Number(p.cashPnl || 0);
             if (pnl > 0) wins++;
             else if (pnl < 0) losses++;
-            totalPnl += pnl;
+            periodPnl += pnl;
           });
-          // Having active positions means you're currently trading
           if (activeCount > 0) lastActivityTs = Date.now() / 1000;
         }
       }
 
-      // Fetch closed positions with pagination (200 per page)
+      // Fetch closed positions with pagination, filtering by cutoff
       let offset = 0;
       const PAGE = 200;
-      while (true) {
-        const closedResp = await fetch(`${API_BASE}/closed-positions?user=${address}&sortBy=realizedpnl&sortDirection=DESC&limit=${PAGE}&offset=${offset}`).catch(() => null);
+      let reachedCutoff = false;
+      while (!reachedCutoff) {
+        const closedResp = await fetch(`${API_BASE}/closed-positions?user=${address}&sortBy=date&sortDirection=DESC&limit=${PAGE}&offset=${offset}`).catch(() => null);
         if (!closedResp || !closedResp.ok) break;
         const closed = await closedResp.json();
         if (!Array.isArray(closed) || closed.length === 0) break;
-        closed.forEach(p => {
-          const pnl = Number(p.realizedPnl || p.cashPnl || 0);
-          if (pnl > 0) wins++;
-          else if (pnl < 0) losses++;
-          totalPnl += pnl;
-          // Track most recent closed position timestamp
-          if (p.timestamp && Number(p.timestamp) > lastActivityTs) {
-            lastActivityTs = Number(p.timestamp);
+        for (const p of closed) {
+          const ts = Number(p.timestamp || 0);
+          // Track most recent activity regardless of period
+          if (ts > lastActivityTs) lastActivityTs = ts;
+          // Only count positions within the selected period
+          if (ts >= cutoffTs) {
+            const pnl = Number(p.realizedPnl || p.cashPnl || 0);
+            if (pnl > 0) wins++;
+            else if (pnl < 0) losses++;
+            periodPnl += pnl;
+          } else if (timePeriod !== 'ALL') {
+            // Positions are sorted by date DESC, so once we pass the cutoff we can stop
+            reachedCutoff = true;
+            break;
           }
-        });
-        if (closed.length < PAGE) break;  // last page
+        }
+        if (closed.length < PAGE) break;
         offset += PAGE;
         if (offset > 2000) break;  // safety cap
       }
@@ -986,13 +1007,13 @@
         marketsLost: losses,
         marketsTraded: total,
         winPct: total > 0 ? (wins / total) * 100 : 0,
-        positionsPnl: totalPnl,
+        periodPnl: periodPnl,
         lastActivityTs,
         daysSinceActive,
         activePositions: activeCount,
       };
 
-      profileCache.set(address, result);
+      profileCache.set(cacheKey, result);
       return result;
     } catch (e) {
       return null;
@@ -1000,7 +1021,7 @@
   }
 
   // Enrich traders with win stats (batched with concurrency limit)
-  async function enrichWithWinStats(traders) {
+  async function enrichWithWinStats(traders, timePeriod) {
     const BATCH_SIZE = 5;
     const enriched = [...traders];
 
@@ -1009,7 +1030,7 @@
     for (let i = 0; i < enriched.length; i += BATCH_SIZE) {
       const batch = enriched.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map(t => getTraderWinStats(t.proxyWallet))
+        batch.map(t => getTraderWinStats(t.proxyWallet, timePeriod))
       );
 
       results.forEach((result, j) => {
@@ -1094,8 +1115,9 @@
         return { ...t, roi };
       });
 
-      // Enrich top 50 traders with win stats
-      traders = await enrichWithWinStats(traders);
+      // Enrich top 50 traders with win stats (period-aware)
+      traders = await enrichWithWinStats(traders, currentTimePeriod);
+      lastEnrichedPeriod = currentTimePeriod;
       currentData = traders;
 
       statusDot.style.background = 'var(--accent-green)';
@@ -1490,3 +1512,4 @@
 </script>
 </body>
 </html>
+
