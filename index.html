@@ -926,15 +926,21 @@
     return addr.slice(0, 6) + '...' + addr.slice(-4);
   }
 
-  // Update the colored fill strip between the two handles of a dual-range slider
+  // Update the colored fill strip between the two handles of a dual-range slider.
+  // Browsers offset the thumb center by half its width from the track edge, so we
+  // use pixel maths rather than bare percentages to keep the fill aligned with the
+  // thumb centres.  Wrapper = 120 px wide, thumb = 16 px → effective range = 104 px.
   function updateDualRangeTrack(fillId, minVal, maxVal, minBound, maxBound) {
     const fill = document.getElementById(fillId);
     if (!fill) return;
-    const range = maxBound - minBound;
-    const leftPct  = ((minVal - minBound) / range) * 100;
-    const widthPct = ((maxVal - minVal)   / range) * 100;
-    fill.style.left  = leftPct + '%';
-    fill.style.width = Math.max(0, widthPct) + '%';
+    const THUMB_HALF = 8;     // half of the 16-px thumb
+    const WRAP_W     = 120;   // .dual-range-wrap width in px
+    const EFFECTIVE  = WRAP_W - 2 * THUMB_HALF;   // 104 px usable span
+    const range      = maxBound - minBound;
+    const leftPx  = THUMB_HALF + ((minVal - minBound) / range) * EFFECTIVE;
+    const widthPx = Math.max(0, ((maxVal - minVal) / range) * EFFECTIVE);
+    fill.style.left  = leftPx  + 'px';
+    fill.style.width = widthPx + 'px';
   }
 
   // --- Filter button setup ---
