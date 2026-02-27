@@ -632,23 +632,26 @@
   /* --- Dual-handle range slider --- */
   .dual-range-wrap {
     position: relative;
-    width: 100px;
-    height: 20px;
-    display: flex;
-    align-items: center;
+    width: 120px;
+    height: 28px;   /* tall enough for the thumb to render */
     flex-shrink: 0;
   }
 
   .dual-range-track-bg {
     position: absolute;
     left: 0; right: 0;
+    top: 50%;
+    transform: translateY(-50%);
     height: 4px;
-    background: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.12);
     border-radius: 2px;
+    pointer-events: none;
   }
 
   .dual-range-track-fill {
     position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
     height: 4px;
     background: var(--accent-blue);
     border-radius: 2px;
@@ -656,10 +659,21 @@
     z-index: 1;
   }
 
+  /* Override the general filter-slider-group input rule for dual-range inputs */
+  .filter-slider-group .dual-range-wrap input[type="range"] {
+    width: 100%;
+    accent-color: transparent;
+    cursor: default;
+  }
+
   .dual-range {
     position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
-    height: 4px;
+    height: 100%;   /* fill the wrapper so the thumb is vertically centered */
+    margin: 0;
+    padding: 0;
     background: transparent;
     -webkit-appearance: none;
     appearance: none;
@@ -670,28 +684,29 @@
 
   .dual-range::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: var(--accent-blue);
     pointer-events: all;
     cursor: pointer;
-    border: 2px solid var(--bg-primary);
+    border: 2px solid #0a0e17;
     box-shadow: 0 0 0 1px var(--accent-blue);
   }
 
   .dual-range::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: var(--accent-blue);
     pointer-events: all;
     cursor: pointer;
-    border: 2px solid var(--bg-primary);
+    border: 2px solid #0a0e17;
+    box-shadow: 0 0 0 1px var(--accent-blue);
   }
 
-  .dual-range::-webkit-slider-runnable-track { background: transparent; }
-  .dual-range::-moz-range-track { background: transparent; }
+  .dual-range::-webkit-slider-runnable-track { background: transparent; height: 0; }
+  .dual-range::-moz-range-track { background: transparent; height: 0; }
 
   @media (max-width: 900px) {
     .charts-row { grid-template-columns: 1fr; }
@@ -959,12 +974,15 @@
     const maxTradesSlider = document.getElementById('maxTradesSlider');
     const tradesVal = document.getElementById('minTradesValue');
     function syncTradesSliders() {
+      let minVal = Number(minTradesSlider.value);
+      let maxVal = Number(maxTradesSlider.value);
       // Prevent handles crossing
-      if (Number(minTradesSlider.value) > Number(maxTradesSlider.value)) {
-        maxTradesSlider.value = minTradesSlider.value;
-      }
-      minTrades = Number(minTradesSlider.value);
-      maxTrades = Number(maxTradesSlider.value);
+      if (minVal > maxVal) { maxTradesSlider.value = minVal; maxVal = minVal; }
+      minTrades = minVal;
+      maxTrades = maxVal;
+      // When both handles are at the same spot, raise the min so it can be dragged left
+      minTradesSlider.style.zIndex = minVal >= maxVal ? '5' : '2';
+      maxTradesSlider.style.zIndex = minVal >= maxVal ? '2' : '5';
       const maxLabel = maxTrades >= 100 ? '100+' : String(maxTrades);
       tradesVal.textContent = minTrades + '–' + maxLabel;
       updateDualRangeTrack('tradesTrackFill', minTrades, maxTrades, 0, 100);
@@ -981,13 +999,16 @@
     const activeMaxSlider = document.getElementById('activeWithinSlider');
     const awVal = document.getElementById('activeWithinValue');
     function syncActiveSliders() {
-      if (Number(activeMinSlider.value) > Number(activeMaxSlider.value)) {
-        activeMaxSlider.value = activeMinSlider.value;
-      }
-      activeWithinMinDays = Number(activeMinSlider.value);
-      activeWithinDays    = Number(activeMaxSlider.value);
-      const minLabel = activeWithinMinDays + 'd';
-      const maxLabel = activeWithinDays >= 365 ? '365d+' : activeWithinDays + 'd';
+      let minVal = Number(activeMinSlider.value);
+      let maxVal = Number(activeMaxSlider.value);
+      if (minVal > maxVal) { activeMaxSlider.value = minVal; maxVal = minVal; }
+      activeWithinMinDays = minVal;
+      activeWithinDays    = maxVal;
+      // When both handles are at the same spot, raise the min so it can be dragged left
+      activeMinSlider.style.zIndex = minVal >= maxVal ? '5' : '2';
+      activeMaxSlider.style.zIndex = minVal >= maxVal ? '2' : '5';
+      const minLabel = minVal + 'd';
+      const maxLabel = maxVal >= 365 ? '365d+' : maxVal + 'd';
       awVal.textContent = minLabel + '–' + maxLabel;
       updateDualRangeTrack('activeTrackFill', activeWithinMinDays, activeWithinDays, 0, 365);
       renderTable();
@@ -1284,12 +1305,16 @@
   // --- Stats cards ---
   function updateStats() {
     let statsPool = [...currentData];
-    // Apply activity range filter to stats
-    statsPool = statsPool.filter(t =>
-      t.daysSinceActive !== null && t.daysSinceActive !== undefined &&
-      t.daysSinceActive >= activeWithinMinDays &&
-      (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays)
-    );
+    // Apply activity range filter to stats.
+    // Only exclude traders with null daysSinceActive when the user has actually moved
+    // a slider (i.e. not the default "show all" range of 0–365d).
+    const isActivityFiltered = activeWithinMinDays > 0 || activeWithinDays < 365;
+    statsPool = statsPool.filter(t => {
+      if (!isActivityFiltered) return true;
+      if (t.daysSinceActive === null || t.daysSinceActive === undefined) return false;
+      return t.daysSinceActive >= activeWithinMinDays &&
+        (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays);
+    });
     // Apply trades range filter
     statsPool = statsPool.filter(t => {
       const tc = t.marketsTraded || 0;
@@ -1343,12 +1368,16 @@
       return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
     });
 
-    // Apply activity range filter
-    pool = pool.filter(t =>
-      t.daysSinceActive !== null && t.daysSinceActive !== undefined &&
-      t.daysSinceActive >= activeWithinMinDays &&
-      (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays)
-    );
+    // Apply activity range filter.
+    // Only exclude traders with null daysSinceActive when the user has actually moved
+    // a slider (i.e. not the default "show all" range of 0–365d).
+    const isActFiltered = activeWithinMinDays > 0 || activeWithinDays < 365;
+    pool = pool.filter(t => {
+      if (!isActFiltered) return true;
+      if (t.daysSinceActive === null || t.daysSinceActive === undefined) return false;
+      return t.daysSinceActive >= activeWithinMinDays &&
+        (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays);
+    });
 
     if (currentSort === 'combo' && comboSortMetrics.length > 0) {
       // Reuse combo sort logic
@@ -1524,12 +1553,16 @@
       return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
     });
 
-    // Apply activity range filter
-    data = data.filter(t =>
-      t.daysSinceActive !== null && t.daysSinceActive !== undefined &&
-      t.daysSinceActive >= activeWithinMinDays &&
-      (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays)
-    );
+    // Apply activity range filter.
+    // Only exclude traders with null daysSinceActive when the user has actually moved
+    // a slider (i.e. not the default "show all" range of 0–365d).
+    const isActFilt = activeWithinMinDays > 0 || activeWithinDays < 365;
+    data = data.filter(t => {
+      if (!isActFilt) return true;
+      if (t.daysSinceActive === null || t.daysSinceActive === undefined) return false;
+      return t.daysSinceActive >= activeWithinMinDays &&
+        (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays);
+    });
 
     // Sort by current tab
     if (currentSort === 'combo' && comboSortMetrics.length > 0) {
