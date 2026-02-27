@@ -875,6 +875,7 @@
       sliderVal.textContent = minTrades;
       renderTable();
       renderCharts();
+      updateStats();
     });
 
     // Active-within slider
@@ -939,9 +940,13 @@
     }
   }
 
-  // Calculate win stats filtered by time period
-  // Active positions are always counted (they're current).
-  // Closed positions are filtered by the cutoff timestamp.
+  // Calculate win stats filtered by time period.
+  // For non-ALL periods, only positions confirmed to be within the period are counted.
+  // Active (open) positions are only counted if they carry a timestamp within the period;
+  // if no timestamp is available, they are excluded from period-specific counts
+  // (we can't confirm when they were opened). For the ALL period, all positions count.
+  // lastActivityTs is derived from real position timestamps — not forced to "now" just
+  // because open positions exist — so the "Active within" slider works correctly.
   async function getTraderWinStats(address, timePeriod) {
     if (!address) return null;
     const cacheKey = address + '|' + timePeriod;
@@ -950,11 +955,11 @@
     const cutoffTs = getPeriodCutoffTs(timePeriod);
 
     try {
-      let wins = 0, losses = 0, periodPnl = 0;
+      let wins = 0, losses = 0, periodTrades = 0, periodPnl = 0;
       let lastActivityTs = 0;
       let activeCount = 0;
 
-      // Fetch active positions (always within any period since they're current)
+      // --- Active (open) positions ---
       const activeResp = await fetch(`${API_BASE}/positions?user=${address}&sizeThreshold=0&limit=200`).catch(() => null);
       if (activeResp && activeResp.ok) {
         const active = await activeResp.json();
@@ -962,15 +967,39 @@
           activeCount = active.length;
           active.forEach(p => {
             const pnl = Number(p.cashPnl || 0);
-            if (pnl > 0) wins++;
-            else if (pnl < 0) losses++;
-            periodPnl += pnl;
+            // Try every field that might contain when this position was opened
+            const rawTs = p.timestamp || p.createdAt || p.startDate || p.dateOpened || p.openDate;
+            const posTs = rawTs
+              ? (typeof rawTs === 'number' ? rawTs : Math.floor(new Date(rawTs).getTime() / 1000))
+              : 0;
+
+            // Update last-activity from a confirmed timestamp
+            if (posTs > 0 && posTs > lastActivityTs) lastActivityTs = posTs;
+
+            // Count toward the period only when we can confirm timing:
+            // - ALL period  → always count (we don't need a timestamp)
+            // - specific period + confirmed timestamp within period → count
+            // - specific period + no timestamp → skip (can't verify it belongs here)
+            const inPeriod = timePeriod === 'ALL' || (posTs > 0 && posTs >= cutoffTs);
+            if (inPeriod) {
+              periodTrades++;
+              if (pnl > 0) wins++;
+              else if (pnl < 0) losses++;
+              periodPnl += pnl;
+            }
           });
-          if (activeCount > 0) lastActivityTs = Date.now() / 1000;
+
+          // If the trader holds active positions but none carried a usable timestamp,
+          // fall back to "active now" so the "Active within" slider still filters them
+          // based on their most-recent closed position (set below) rather than never
+          // showing them at all.
+          if (activeCount > 0 && lastActivityTs === 0) {
+            lastActivityTs = Date.now() / 1000;
+          }
         }
       }
 
-      // Fetch closed positions with pagination, filtering by cutoff
+      // --- Closed positions (newest first, paginated) ---
       let offset = 0;
       const PAGE = 200;
       let reachedCutoff = false;
@@ -981,35 +1010,38 @@
         if (!Array.isArray(closed) || closed.length === 0) break;
         for (const p of closed) {
           const ts = Number(p.timestamp || 0);
-          // Track most recent activity regardless of period
+          // A closed-position timestamp is always reliable — use it for lastActivityTs
           if (ts > lastActivityTs) lastActivityTs = ts;
-          // Only count positions within the selected period
           if (ts >= cutoffTs) {
+            periodTrades++;
             const pnl = Number(p.realizedPnl || p.cashPnl || 0);
             if (pnl > 0) wins++;
             else if (pnl < 0) losses++;
             periodPnl += pnl;
           } else if (timePeriod !== 'ALL') {
-            // Positions are sorted by date DESC, so once we pass the cutoff we can stop
+            // Sorted DESC — everything from here is older than the cutoff, stop paging
             reachedCutoff = true;
             break;
           }
         }
         if (closed.length < PAGE) break;
         offset += PAGE;
-        if (offset > 2000) break;  // safety cap
+        if (offset > 2000) break;
       }
 
       const total = wins + losses;
-      const daysSinceActive = lastActivityTs > 0 ? Math.round((Date.now() / 1000 - lastActivityTs) / 86400) : null;
+      const daysSinceActive = lastActivityTs > 0
+        ? Math.round((Date.now() / 1000 - lastActivityTs) / 86400)
+        : null;
+
       const result = {
         marketsWon: wins,
         marketsLost: losses,
-        marketsTraded: total,
+        marketsTraded: periodTrades,   // ← only positions confirmed within the selected period
         winPct: total > 0 ? (wins / total) * 100 : 0,
-        periodPnl: periodPnl,
+        periodPnl,
         lastActivityTs,
-        daysSinceActive,
+        daysSinceActive,               // ← derived from real timestamps, not "has open bets"
         activePositions: activeCount,
       };
 
