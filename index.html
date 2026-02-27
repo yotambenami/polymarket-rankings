@@ -639,7 +639,7 @@
 
   .dual-range-track-bg {
     position: absolute;
-    left: 0; right: 0;
+    left: 8px; right: 8px;   /* inset by half-thumb so endpoints align with handles */
     top: 50%;
     transform: translateY(-50%);
     height: 4px;
@@ -1190,7 +1190,7 @@
 
   // Enrich traders with win stats (batched with concurrency limit)
   async function enrichWithWinStats(traders, timePeriod) {
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 3;  // smaller batches → fewer concurrent API hits → less rate-limiting
     const enriched = [...traders];
 
     document.getElementById('statusText').textContent = 'Enriching win stats...';
@@ -1411,7 +1411,10 @@
       // Show the first selected metric in bar chart
       chartMode = comboSortMetrics[0] || 'pnl';
     } else if (currentSort === 'winPct') {
+      // For the chart only show traders with real win data (otherwise bar at 0% is misleading)
       sorted = pool.filter(t => t.winPct !== null && t.marketsTraded >= 3).sort((a, b) => b.winPct - a.winPct).slice(0, 20);
+      // If too few have data, fall back to showing all by PnL so chart isn't nearly empty
+      if (sorted.length < 5) sorted = pool.sort((a, b) => b.pnl - a.pnl).slice(0, 20);
       chartLabel = 'Win %';
       chartMode = 'winPct';
     } else if (currentSort === 'vol') {
@@ -1611,8 +1614,15 @@
     } else if (currentSort === 'roi') {
       data.sort((a, b) => b.roi - a.roi);
     } else if (currentSort === 'winPct') {
-      data = data.filter(t => t.winPct !== null && t.marketsTraded >= 3);
-      data.sort((a, b) => b.winPct - a.winPct);
+      // Sort: traders with real win data first (high→low), then those without data at bottom
+      data.sort((a, b) => {
+        const aHas = a.winPct !== null && a.marketsTraded >= 3;
+        const bHas = b.winPct !== null && b.marketsTraded >= 3;
+        if (aHas && bHas) return b.winPct - a.winPct;
+        if (aHas) return -1;   // a has data → comes first
+        if (bHas) return 1;    // b has data → comes first
+        return b.pnl - a.pnl;  // both no data → sort by PnL
+      });
     }
 
     data = data.slice(0, 20);
@@ -1620,8 +1630,7 @@
     const tbody = document.getElementById('tableBody');
 
     if (data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-secondary)">No traders found' +
-        (currentSort === 'winPct' ? ' (win data requires fetching per-trader profiles)' : '') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-secondary)">No traders match the current filters.</td></tr>';
       return;
     }
 
