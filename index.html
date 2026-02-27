@@ -629,6 +629,70 @@
 
   .tooltip:hover::after { opacity: 1; }
 
+  /* --- Dual-handle range slider --- */
+  .dual-range-wrap {
+    position: relative;
+    width: 100px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .dual-range-track-bg {
+    position: absolute;
+    left: 0; right: 0;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+  }
+
+  .dual-range-track-fill {
+    position: absolute;
+    height: 4px;
+    background: var(--accent-blue);
+    border-radius: 2px;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .dual-range {
+    position: absolute;
+    width: 100%;
+    height: 4px;
+    background: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: none;
+    z-index: 2;
+    outline: none;
+  }
+
+  .dual-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    pointer-events: all;
+    cursor: pointer;
+    border: 2px solid var(--bg-primary);
+    box-shadow: 0 0 0 1px var(--accent-blue);
+  }
+
+  .dual-range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    pointer-events: all;
+    cursor: pointer;
+    border: 2px solid var(--bg-primary);
+  }
+
+  .dual-range::-webkit-slider-runnable-track { background: transparent; }
+  .dual-range::-moz-range-track { background: transparent; }
+
   @media (max-width: 900px) {
     .charts-row { grid-template-columns: 1fr; }
     .header { padding: 16px 20px; }
@@ -689,15 +753,25 @@
   </div>
 
   <div class="filter-slider-group">
-    <label>Min Trades</label>
-    <input type="range" id="minTradesSlider" min="0" max="100" value="0" step="5">
-    <span class="slider-value" id="minTradesValue">0</span>
+    <label>Trades</label>
+    <div class="dual-range-wrap" id="tradesRangeWrap">
+      <div class="dual-range-track-bg"></div>
+      <div class="dual-range-track-fill" id="tradesTrackFill"></div>
+      <input type="range" class="dual-range" id="minTradesSlider" min="0" max="100" value="0" step="5">
+      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="100" step="5">
+    </div>
+    <span class="slider-value" id="minTradesValue">0–100+</span>
   </div>
 
   <div class="filter-slider-group">
-    <label>Active within</label>
-    <input type="range" id="activeWithinSlider" min="7" max="365" value="365" step="7">
-    <span class="slider-value" id="activeWithinValue">365d</span>
+    <label>Last active</label>
+    <div class="dual-range-wrap" id="activeRangeWrap">
+      <div class="dual-range-track-bg"></div>
+      <div class="dual-range-track-fill" id="activeTrackFill"></div>
+      <input type="range" class="dual-range" id="activeWithinMinSlider" min="0" max="365" value="0" step="7">
+      <input type="range" class="dual-range" id="activeWithinSlider" min="0" max="365" value="365" step="7">
+    </div>
+    <span class="slider-value" id="activeWithinValue">0–365d+</span>
   </div>
 
   <input type="text" class="search-box" id="searchBox" placeholder="Search trader name...">
@@ -803,7 +877,9 @@
   let currentCategory = 'OVERALL';
   let currentSort = 'pnl';
   let minTrades = 0;
-  let activeWithinDays = 365;  // only show accounts active within this many days
+  let maxTrades = 100;           // upper bound for trades filter (100 = no upper limit)
+  let activeWithinMinDays = 0;   // lower bound: trader must have been active at least this many days ago
+  let activeWithinDays = 365;    // upper bound: trader must have been active within this many days (365 = no limit)
   let comboSortMetrics = [];  // ordered list of metrics for combined ranking
   let profileCache = new Map();  // key = "address|timePeriod"
   let lastEnrichedPeriod = null;  // track which period was last enriched
@@ -833,6 +909,17 @@
   function shortenAddr(addr) {
     if (!addr) return '';
     return addr.slice(0, 6) + '...' + addr.slice(-4);
+  }
+
+  // Update the colored fill strip between the two handles of a dual-range slider
+  function updateDualRangeTrack(fillId, minVal, maxVal, minBound, maxBound) {
+    const fill = document.getElementById(fillId);
+    if (!fill) return;
+    const range = maxBound - minBound;
+    const leftPct  = ((minVal - minBound) / range) * 100;
+    const widthPct = ((maxVal - minVal)   / range) * 100;
+    fill.style.left  = leftPct + '%';
+    fill.style.width = Math.max(0, widthPct) + '%';
   }
 
   // --- Filter button setup ---
@@ -867,27 +954,49 @@
       });
     });
 
-    // Min trades slider
-    const slider = document.getElementById('minTradesSlider');
-    const sliderVal = document.getElementById('minTradesValue');
-    slider.addEventListener('input', () => {
-      minTrades = Number(slider.value);
-      sliderVal.textContent = minTrades;
+    // Trades dual-range slider
+    const minTradesSlider = document.getElementById('minTradesSlider');
+    const maxTradesSlider = document.getElementById('maxTradesSlider');
+    const tradesVal = document.getElementById('minTradesValue');
+    function syncTradesSliders() {
+      // Prevent handles crossing
+      if (Number(minTradesSlider.value) > Number(maxTradesSlider.value)) {
+        maxTradesSlider.value = minTradesSlider.value;
+      }
+      minTrades = Number(minTradesSlider.value);
+      maxTrades = Number(maxTradesSlider.value);
+      const maxLabel = maxTrades >= 100 ? '100+' : String(maxTrades);
+      tradesVal.textContent = minTrades + '–' + maxLabel;
+      updateDualRangeTrack('tradesTrackFill', minTrades, maxTrades, 0, 100);
       renderTable();
       renderCharts();
       updateStats();
-    });
+    }
+    minTradesSlider.addEventListener('input', syncTradesSliders);
+    maxTradesSlider.addEventListener('input', syncTradesSliders);
+    updateDualRangeTrack('tradesTrackFill', 0, 100, 0, 100); // initial fill
 
-    // Active-within slider
-    const awSlider = document.getElementById('activeWithinSlider');
+    // Active-within dual-range slider
+    const activeMinSlider = document.getElementById('activeWithinMinSlider');
+    const activeMaxSlider = document.getElementById('activeWithinSlider');
     const awVal = document.getElementById('activeWithinValue');
-    awSlider.addEventListener('input', () => {
-      activeWithinDays = Number(awSlider.value);
-      awVal.textContent = activeWithinDays + 'd';
+    function syncActiveSliders() {
+      if (Number(activeMinSlider.value) > Number(activeMaxSlider.value)) {
+        activeMaxSlider.value = activeMinSlider.value;
+      }
+      activeWithinMinDays = Number(activeMinSlider.value);
+      activeWithinDays    = Number(activeMaxSlider.value);
+      const minLabel = activeWithinMinDays + 'd';
+      const maxLabel = activeWithinDays >= 365 ? '365d+' : activeWithinDays + 'd';
+      awVal.textContent = minLabel + '–' + maxLabel;
+      updateDualRangeTrack('activeTrackFill', activeWithinMinDays, activeWithinDays, 0, 365);
       renderTable();
       renderCharts();
       updateStats();
-    });
+    }
+    activeMinSlider.addEventListener('input', syncActiveSliders);
+    activeMaxSlider.addEventListener('input', syncActiveSliders);
+    updateDualRangeTrack('activeTrackFill', 0, 365, 0, 365); // initial fill
 
     // Combined sort chips (multi-select, ordered)
     document.querySelectorAll('#sortComboPanel .sort-chip').forEach(chip => {
@@ -1175,11 +1284,17 @@
   // --- Stats cards ---
   function updateStats() {
     let statsPool = [...currentData];
-    // Apply activity filter to stats
-    statsPool = statsPool.filter(t => t.daysSinceActive !== null && t.daysSinceActive !== undefined && t.daysSinceActive <= activeWithinDays);
-    if (minTrades > 0) {
-      statsPool = statsPool.filter(t => (t.marketsTraded || 0) >= minTrades);
-    }
+    // Apply activity range filter to stats
+    statsPool = statsPool.filter(t =>
+      t.daysSinceActive !== null && t.daysSinceActive !== undefined &&
+      t.daysSinceActive >= activeWithinMinDays &&
+      (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays)
+    );
+    // Apply trades range filter
+    statsPool = statsPool.filter(t => {
+      const tc = t.marketsTraded || 0;
+      return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
+    });
     const sorted = statsPool.sort((a, b) => b.pnl - a.pnl);
     const top20 = sorted.slice(0, 20);
 
@@ -1221,14 +1336,19 @@
     let chartLabel;
     let chartMode = 'pnl'; // what the bar chart shows
 
-    // Apply min trades filter first
+    // Apply trades range filter
     let pool = [...currentData];
-    if (minTrades > 0) {
-      pool = pool.filter(t => (t.marketsTraded || 0) >= minTrades);
-    }
+    pool = pool.filter(t => {
+      const tc = t.marketsTraded || 0;
+      return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
+    });
 
-    // Apply activity recency filter
-    pool = pool.filter(t => t.daysSinceActive !== null && t.daysSinceActive !== undefined && t.daysSinceActive <= activeWithinDays);
+    // Apply activity range filter
+    pool = pool.filter(t =>
+      t.daysSinceActive !== null && t.daysSinceActive !== undefined &&
+      t.daysSinceActive >= activeWithinMinDays &&
+      (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays)
+    );
 
     if (currentSort === 'combo' && comboSortMetrics.length > 0) {
       // Reuse combo sort logic
@@ -1398,13 +1518,18 @@
       );
     }
 
-    // Apply min trades filter
-    if (minTrades > 0) {
-      data = data.filter(t => (t.marketsTraded || 0) >= minTrades);
-    }
+    // Apply trades range filter
+    data = data.filter(t => {
+      const tc = t.marketsTraded || 0;
+      return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
+    });
 
-    // Apply activity recency filter
-    data = data.filter(t => t.daysSinceActive !== null && t.daysSinceActive !== undefined && t.daysSinceActive <= activeWithinDays);
+    // Apply activity range filter
+    data = data.filter(t =>
+      t.daysSinceActive !== null && t.daysSinceActive !== undefined &&
+      t.daysSinceActive >= activeWithinMinDays &&
+      (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays)
+    );
 
     // Sort by current tab
     if (currentSort === 'combo' && comboSortMetrics.length > 0) {
