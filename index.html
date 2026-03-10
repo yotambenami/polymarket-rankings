@@ -774,9 +774,9 @@
       <div class="dual-range-track-bg"></div>
       <div class="dual-range-track-fill" id="tradesTrackFill"></div>
       <input type="range" class="dual-range" id="minTradesSlider" min="0" max="100" value="1" step="1">
-      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="30" step="5">
+      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="100" step="5">
     </div>
-    <span class="slider-value" id="minTradesValue">5–30</span>
+    <span class="slider-value" id="minTradesValue">1–100+</span>
   </div>
 
   <input type="text" class="search-box" id="searchBox" placeholder="Search trader name...">
@@ -882,7 +882,7 @@
   let currentCategory = 'OVERALL';
   let currentSort = 'pnl';
   let minTrades = 1;
-  let maxTrades = 30;
+  let maxTrades = 100;
   let activeWithinMinDays = 0;   // kept for filter logic but slider is removed
   let activeWithinDays = 365;    // kept for filter logic but slider is removed
   let comboSortMetrics = [];  // ordered list of metrics for combined ranking
