@@ -898,6 +898,7 @@
   let comboSortMetrics = [];  // ordered list of metrics for combined ranking
   let profileCache = new Map();  // key = "address|timePeriod"
   let lastEnrichedPeriod = null;  // track which period was last enriched
+  let fetchSeq = 0;  // incremented each fetchData() call; stale calls self-abort
 
   // --- Formatting helpers ---
   function formatUSD(val) {
@@ -1214,11 +1215,19 @@
         } else {
           enriched[idx].marketsWon = 0;
           enriched[idx].marketsLost = 0;
-          enriched[idx].marketsTraded = 0;
+          enriched[idx].marketsTraded = enriched[idx].marketsTraded || 0;
           enriched[idx].winPct = null;
-          enriched[idx].lastActivityTs = 0;
-          enriched[idx].daysSinceActive = null;
           enriched[idx].activePositions = 0;
+          // Try to salvage lastActivityTs from any timestamp the leaderboard already gave us
+          const raw = enriched[idx].lastTrade || enriched[idx].lastActive ||
+                      enriched[idx].lastTradeTime || enriched[idx].updatedAt;
+          const fallbackTs = raw
+            ? (typeof raw === 'number' ? raw : Math.floor(new Date(raw).getTime() / 1000))
+            : 0;
+          enriched[idx].lastActivityTs = fallbackTs;
+          enriched[idx].daysSinceActive = fallbackTs > 0
+            ? Math.round((Date.now() / 1000 - fallbackTs) / 86400)
+            : null;
         }
       });
 
@@ -1231,6 +1240,10 @@
   }
 
   async function fetchData() {
+    // Stamp this call so we can detect if a newer call supersedes it
+    fetchSeq++;
+    const mySeq = fetchSeq;
+
     const refreshBtn = document.getElementById('refreshBtn');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
@@ -1247,6 +1260,9 @@
         fetchLeaderboard('PNL', 50),
         fetchLeaderboard('VOL', 50)
       ]);
+
+      // If a newer fetchData() was triggered while we were waiting, bail out
+      if (mySeq !== fetchSeq) return;
 
       // Merge: build a map by wallet address
       const traderMap = new Map();
@@ -1285,6 +1301,10 @@
 
       // Enrich top 50 traders with win stats (period-aware)
       traders = await enrichWithWinStats(traders, currentTimePeriod);
+
+      // Bail out if a newer fetch started while enrichment was running
+      if (mySeq !== fetchSeq) return;
+
       lastEnrichedPeriod = currentTimePeriod;
       currentData = traders;
 
