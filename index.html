@@ -1437,7 +1437,7 @@
       chartMode = comboSortMetrics[0] || 'pnl';
     } else if (currentSort === 'winPct') {
       // For the chart only show traders with real win data (otherwise bar at 0% is misleading)
-      sorted = pool.filter(t => t.winPct !== null && t.marketsTraded >= 3).sort((a, b) => b.winPct - a.winPct).slice(0, 20);
+      sorted = pool.filter(t => t.winPct !== null && t.marketsTraded >= 1).sort((a, b) => b.winPct - a.winPct).slice(0, 20);
       // If too few have data, fall back to showing all by PnL so chart isn't nearly empty
       if (sorted.length < 5) sorted = pool.sort((a, b) => b.pnl - a.pnl).slice(0, 20);
       chartLabel = 'Win %';
@@ -1642,8 +1642,8 @@
     } else if (currentSort === 'winPct') {
       // Sort: traders with real win data first (high→low), then those without data at bottom
       data.sort((a, b) => {
-        const aHas = a.winPct !== null && a.marketsTraded >= 3;
-        const bHas = b.winPct !== null && b.marketsTraded >= 3;
+        const aHas = a.winPct !== null && a.marketsTraded >= 1;
+        const bHas = b.winPct !== null && b.marketsTraded >= 1;
         if (aHas && bHas) return b.winPct - a.winPct;
         if (aHas) return -1;   // a has data → comes first
         if (bHas) return 1;    // b has data → comes first
