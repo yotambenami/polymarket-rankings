@@ -1181,7 +1181,7 @@
 
   // Enrich traders with win stats (batched with concurrency limit)
   async function enrichWithWinStats(traders, timePeriod) {
-    const BATCH_SIZE = 3;  // smaller batches → fewer concurrent API hits → less rate-limiting
+    const BATCH_SIZE = 5;  // balance speed vs. API rate-limits
     const enriched = [...traders];
 
     document.getElementById('statusText').textContent = 'Enriching win stats...';
@@ -1253,9 +1253,12 @@
     errorBanner.classList.remove('visible');
 
     try {
-      // Fetch both PNL and VOL leaderboards to merge data
+      // Fetch both PNL and VOL leaderboards to merge data.
+      // Pull 1000 from PNL for a large pool — local filters (trades slider,
+      // win-rate sort) operate on this set, so we need enough genuine winners
+      // in reserve after enrichment flips some leaderboard "winners" negative.
       const [pnlData, volData] = await Promise.all([
-        fetchLeaderboard('PNL', 50),
+        fetchLeaderboard('PNL', 1000),
         fetchLeaderboard('VOL', 50)
       ]);
 
@@ -1302,11 +1305,22 @@
         return { ...t, roi, marketsTraded: leaderboardTrades };
       });
 
-      // Enrich top 50 traders with win stats (period-aware)
-      traders = await enrichWithWinStats(traders, currentTimePeriod);
+      // Enrich only the top traders — enriching all 1000 would take ~6 minutes.
+      // Sort by leaderboard PNL rank first so we enrich the most promising ones.
+      const ENRICH_LIMIT = 150;
+      traders.sort((a, b) => (a.pnlRank || 9999) - (b.pnlRank || 9999));
+      const toEnrich = traders.slice(0, ENRICH_LIMIT);
+      const remainder = traders.slice(ENRICH_LIMIT);
+      const enriched150 = await enrichWithWinStats(toEnrich, currentTimePeriod);
+      traders = [...enriched150, ...remainder];
 
       // Bail out if a newer fetch started while enrichment was running
       if (mySeq !== fetchSeq) return;
+
+      // Sort the pool by true enriched PnL so genuine winners float to the
+      // top regardless of how the leaderboard originally ordered them.
+      // Filters and re-sorts in renderTable/renderCharts work on this pool.
+      traders.sort((a, b) => b.pnl - a.pnl);
 
       lastEnrichedPeriod = currentTimePeriod;
       currentData = traders;
