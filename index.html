@@ -755,8 +755,8 @@
   <div class="filter-group" id="timePeriodFilter">
     <button class="filter-btn" data-value="DAY">24h</button>
     <button class="filter-btn" data-value="WEEK">7d</button>
-    <button class="filter-btn" data-value="MONTH">30d</button>
-    <button class="filter-btn active" data-value="ALL">All Time</button>
+    <button class="filter-btn active" data-value="MONTH">30d</button>
+    <button class="filter-btn" data-value="ALL">All Time</button>
   </div>
 
   <span class="filter-label" style="margin-left:12px">Category</span>
@@ -772,21 +772,10 @@
     <div class="dual-range-wrap" id="tradesRangeWrap">
       <div class="dual-range-track-bg"></div>
       <div class="dual-range-track-fill" id="tradesTrackFill"></div>
-      <input type="range" class="dual-range" id="minTradesSlider" min="0" max="100" value="0" step="5">
-      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="100" step="5">
+      <input type="range" class="dual-range" id="minTradesSlider" min="0" max="100" value="5" step="5">
+      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="30" step="5">
     </div>
-    <span class="slider-value" id="minTradesValue">0–100+</span>
-  </div>
-
-  <div class="filter-slider-group">
-    <label>Last active</label>
-    <div class="dual-range-wrap" id="activeRangeWrap">
-      <div class="dual-range-track-bg"></div>
-      <div class="dual-range-track-fill" id="activeTrackFill"></div>
-      <input type="range" class="dual-range" id="activeWithinMinSlider" min="0" max="365" value="0" step="7">
-      <input type="range" class="dual-range" id="activeWithinSlider" min="0" max="365" value="365" step="7">
-    </div>
-    <span class="slider-value" id="activeWithinValue">0–365d+</span>
+    <span class="slider-value" id="minTradesValue">5–30</span>
   </div>
 
   <input type="text" class="search-box" id="searchBox" placeholder="Search trader name...">
@@ -888,13 +877,13 @@
   let currentData = [];
   let pnlChart = null;
   let scatterChart = null;
-  let currentTimePeriod = 'ALL';
+  let currentTimePeriod = 'MONTH';
   let currentCategory = 'OVERALL';
   let currentSort = 'pnl';
-  let minTrades = 0;
-  let maxTrades = 100;           // upper bound for trades filter (100 = no upper limit)
-  let activeWithinMinDays = 0;   // lower bound: trader must have been active at least this many days ago
-  let activeWithinDays = 365;    // upper bound: trader must have been active within this many days (365 = no limit)
+  let minTrades = 5;
+  let maxTrades = 30;
+  let activeWithinMinDays = 0;   // kept for filter logic but slider is removed
+  let activeWithinDays = 365;    // kept for filter logic but slider is removed
   let comboSortMetrics = [];  // ordered list of metrics for combined ranking
   let profileCache = new Map();  // key = "address|timePeriod"
   let lastEnrichedPeriod = null;  // track which period was last enriched
@@ -999,32 +988,7 @@
     }
     minTradesSlider.addEventListener('input', syncTradesSliders);
     maxTradesSlider.addEventListener('input', syncTradesSliders);
-    updateDualRangeTrack('tradesTrackFill', 0, 100, 0, 100); // initial fill
-
-    // Active-within dual-range slider
-    const activeMinSlider = document.getElementById('activeWithinMinSlider');
-    const activeMaxSlider = document.getElementById('activeWithinSlider');
-    const awVal = document.getElementById('activeWithinValue');
-    function syncActiveSliders() {
-      let minVal = Number(activeMinSlider.value);
-      let maxVal = Number(activeMaxSlider.value);
-      if (minVal > maxVal) { activeMaxSlider.value = minVal; maxVal = minVal; }
-      activeWithinMinDays = minVal;
-      activeWithinDays    = maxVal;
-      // When both handles are at the same spot, raise the min so it can be dragged left
-      activeMinSlider.style.zIndex = minVal >= maxVal ? '5' : '2';
-      activeMaxSlider.style.zIndex = minVal >= maxVal ? '2' : '5';
-      const minLabel = minVal + 'd';
-      const maxLabel = maxVal >= 365 ? '365d+' : maxVal + 'd';
-      awVal.textContent = minLabel + '–' + maxLabel;
-      updateDualRangeTrack('activeTrackFill', activeWithinMinDays, activeWithinDays, 0, 365);
-      renderTable();
-      renderCharts();
-      updateStats();
-    }
-    activeMinSlider.addEventListener('input', syncActiveSliders);
-    activeMaxSlider.addEventListener('input', syncActiveSliders);
-    updateDualRangeTrack('activeTrackFill', 0, 365, 0, 365); // initial fill
+    updateDualRangeTrack('tradesTrackFill', 5, 30, 0, 100); // initial fill at default 5–30
 
     // Combined sort chips (multi-select, ordered)
     document.querySelectorAll('#sortComboPanel .sort-chip').forEach(chip => {
