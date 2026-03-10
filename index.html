@@ -765,6 +765,7 @@
     <button class="filter-btn" data-value="POLITICS">Politics</button>
     <button class="filter-btn" data-value="SPORTS">Sports</button>
     <button class="filter-btn" data-value="CRYPTO">Crypto</button>
+    <button class="filter-btn" data-value="WEATHER">Weather</button>
   </div>
 
   <div class="filter-slider-group">
@@ -1257,10 +1258,15 @@
         }
       });
 
-      // Calculate derived metrics
+      // Calculate derived metrics.
+      // Seed marketsTraded from the leaderboard's own positionsWon/Lost fields so
+      // the trades filter works even before per-trader enrichment completes.
       let traders = Array.from(traderMap.values()).map(t => {
         const roi = t.vol > 0 ? (t.pnl / t.vol) * 100 : 0;
-        return { ...t, roi };
+        const leaderboardTrades =
+          (Number(t.positionsWon) || 0) + (Number(t.positionsLost) || 0) ||
+          Number(t.marketsTraded) || 0;
+        return { ...t, roi, marketsTraded: leaderboardTrades };
       });
 
       // Enrich top 50 traders with win stats (period-aware)
