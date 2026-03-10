@@ -773,10 +773,10 @@
     <div class="dual-range-wrap" id="tradesRangeWrap">
       <div class="dual-range-track-bg"></div>
       <div class="dual-range-track-fill" id="tradesTrackFill"></div>
-      <input type="range" class="dual-range" id="minTradesSlider" min="0" max="100" value="0" step="5">
-      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="100" step="5">
+      <input type="range" class="dual-range" id="minTradesSlider" min="0" max="100" value="5" step="5">
+      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="30" step="5">
     </div>
-    <span class="slider-value" id="minTradesValue">0–100+</span>
+    <span class="slider-value" id="minTradesValue">5–30</span>
   </div>
 
   <input type="text" class="search-box" id="searchBox" placeholder="Search trader name...">
@@ -881,8 +881,8 @@
   let currentTimePeriod = 'MONTH';
   let currentCategory = 'OVERALL';
   let currentSort = 'pnl';
-  let minTrades = 0;
-  let maxTrades = 100;  // 100 = no upper limit
+  let minTrades = 5;
+  let maxTrades = 30;
   let activeWithinMinDays = 0;   // kept for filter logic but slider is removed
   let activeWithinDays = 365;    // kept for filter logic but slider is removed
   let comboSortMetrics = [];  // ordered list of metrics for combined ranking
@@ -989,7 +989,7 @@
     }
     minTradesSlider.addEventListener('input', syncTradesSliders);
     maxTradesSlider.addEventListener('input', syncTradesSliders);
-    updateDualRangeTrack('tradesTrackFill', 0, 100, 0, 100); // initial fill
+    updateDualRangeTrack('tradesTrackFill', 5, 30, 0, 100); // initial fill at default 5–30
 
     // Combined sort chips (multi-select, ordered)
     document.querySelectorAll('#sortComboPanel .sort-chip').forEach(chip => {
@@ -1311,9 +1311,10 @@
       return t.daysSinceActive >= activeWithinMinDays &&
         (activeWithinDays >= 365 || t.daysSinceActive <= activeWithinDays);
     });
-    // Apply trades range filter
+    // Apply trades range filter — tc=0 means no data yet, always let through
     statsPool = statsPool.filter(t => {
       const tc = t.marketsTraded || 0;
+      if (tc === 0) return true;
       return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
     });
     const sorted = statsPool.sort((a, b) => b.pnl - a.pnl);
@@ -1357,10 +1358,11 @@
     let chartLabel;
     let chartMode = 'pnl'; // what the bar chart shows
 
-    // Apply trades range filter
+    // Apply trades range filter — tc=0 means no data yet, always let through
     let pool = [...currentData];
     pool = pool.filter(t => {
       const tc = t.marketsTraded || 0;
+      if (tc === 0) return true;
       return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
     });
 
@@ -1546,9 +1548,10 @@
       );
     }
 
-    // Apply trades range filter
+    // Apply trades range filter — tc=0 means no data yet, always let through
     data = data.filter(t => {
       const tc = t.marketsTraded || 0;
+      if (tc === 0) return true;
       return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
     });
 
