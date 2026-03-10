@@ -1067,37 +1067,58 @@
         const active = await activeResp.json();
         if (Array.isArray(active)) {
           activeCount = active.length;
+          const nowTs = Date.now() / 1000;
           active.forEach(p => {
-            const pnl = Number(p.cashPnl || 0);
-            // Try every field that might contain when this position was opened
+            const curPrice = Number(p.curPrice ?? 1);
+
+            // endDate is reliably returned by /positions and tells us when the
+            // market resolved (or is scheduled to resolve).
+            const endDateStr = p.endDate;
+            const endTs = endDateStr
+              ? Math.floor(new Date(endDateStr.includes('T') ? endDateStr : endDateStr + 'T00:00:00Z').getTime() / 1000)
+              : 0;
+
+            // Fall back to open-timestamp fields if no endDate
             const rawTs = p.timestamp || p.createdAt || p.startDate || p.dateOpened || p.openDate;
-            const posTs = rawTs
+            const openTs = rawTs
               ? (typeof rawTs === 'number' ? rawTs : Math.floor(new Date(rawTs).getTime() / 1000))
               : 0;
 
-            // Update last-activity from a confirmed timestamp
+            // A position is "resolved" if endDate is in the past
+            const isResolved = endTs > 0 && endTs < nowTs;
+
+            // Use endDate as the activity timestamp for resolved positions so
+            // "last active" reflects when the market actually settled, not now.
+            const posTs = isResolved ? endTs : openTs;
             if (posTs > 0 && posTs > lastActivityTs) lastActivityTs = posTs;
 
-            // Count toward the period only when we can confirm timing:
-            // - ALL period  → always count (we don't need a timestamp)
-            // - specific period + confirmed timestamp within period → count
-            // - specific period + no timestamp → skip (can't verify it belongs here)
-            const inPeriod = timePeriod === 'ALL' || (posTs > 0 && posTs >= cutoffTs);
-            if (inPeriod) {
-              periodTrades++;
-              if (pnl > 0) wins++;
-              else if (pnl < 0) losses++;
-              periodPnl += pnl;
+            if (isResolved && curPrice <= 0.01) {
+              // ── Resolved LOSING position (price went to ~0) ──
+              // These never appear in /closed-positions because there's nothing
+              // to redeem, so they're invisible to the normal win-stats pass.
+              // Count them explicitly using cashPnl (≈ –amountInvested).
+              const inPeriod = timePeriod === 'ALL' || (endTs >= cutoffTs);
+              if (inPeriod) {
+                periodTrades++;
+                losses++;
+                periodPnl += Number(p.cashPnl || 0);
+              }
+            } else if (!isResolved) {
+              // ── Still-live (unresolved) position ──
+              // Count for ALL period always; for specific periods only if we
+              // have a confirmed open timestamp within the window.
+              const inPeriod = timePeriod === 'ALL' || (posTs > 0 && posTs >= cutoffTs);
+              if (inPeriod) {
+                periodTrades++;
+                const pnl = Number(p.cashPnl || 0);
+                if (pnl > 0) wins++;
+                else if (pnl < 0) losses++;
+                periodPnl += pnl;
+              }
             }
+            // Resolved WINNING positions (curPrice ≈ 1) are counted via
+            // /closed-positions once redeemed — skip here to avoid double-counting.
           });
-
-          // If the trader holds active positions but none carried a usable timestamp,
-          // fall back to "active now" so the "Active within" slider still filters them
-          // based on their most-recent closed position (set below) rather than never
-          // showing them at all.
-          if (activeCount > 0 && lastActivityTs === 0) {
-            lastActivityTs = Date.now() / 1000;
-          }
         }
       }
 
@@ -1142,6 +1163,10 @@
         marketsTraded: periodTrades,   // ← only positions confirmed within the selected period
         winPct: total > 0 ? (wins / total) * 100 : 0,
         periodPnl,
+        // True when we actually computed period PnL from position data (vs. zero
+        // because enrichment found nothing at all). Used to decide whether to
+        // override the leaderboard pnl with the position-derived figure.
+        hasPeriodData: periodTrades > 0 || losses > 0,
         lastActivityTs,
         daysSinceActive,               // ← derived from real timestamps, not "has open bets"
         activePositions: activeCount,
@@ -1177,6 +1202,14 @@
           enriched[idx].lastActivityTs = result.value.lastActivityTs;
           enriched[idx].daysSinceActive = result.value.daysSinceActive;
           enriched[idx].activePositions = result.value.activePositions;
+          // Override leaderboard pnl with the position-derived figure when we
+          // successfully computed it. This captures unredeemed losing positions
+          // that the leaderboard API never sees (they resolve to $0 and vanish).
+          if (result.value.hasPeriodData) {
+            enriched[idx].pnl = result.value.periodPnl;
+            enriched[idx].roi = enriched[idx].vol > 0
+              ? (enriched[idx].pnl / enriched[idx].vol) * 100 : 0;
+          }
         } else {
           enriched[idx].marketsWon = 0;
           enriched[idx].marketsLost = 0;
