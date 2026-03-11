@@ -1380,17 +1380,20 @@
         return { ...t, roi, marketsTraded: leaderboardTrades };
       });
 
-      // ── Show raw leaderboard data immediately ──
-      // Gives the user an instant first render; win stats fill in below.
+      // ── Show raw leaderboard data immediately (only if no cache is showing) ──
+      // If the user already sees cached data, skip this intermediate render to
+      // avoid a flash where win rates disappear before enrichment fills them in.
       traders.sort((a, b) => b.pnl - a.pnl);
       currentData = traders;
       lastEnrichedPeriod = currentTimePeriod;
       document.getElementById('loadingOverlay').classList.add('hidden');
       statusDot.style.background = 'var(--accent-amber)';
       statusText.textContent = 'Loading win stats\u2026';
-      updateStats();
-      renderCharts();
-      renderTable();
+      if (!hasCachedData) {
+        updateStats();
+        renderCharts();
+        renderTable();
+      }
 
       if (mySeq !== fetchSeq) return;
 
@@ -1972,6 +1975,7 @@
   setupFilters();
 
   // Try to render cached data instantly before the live fetch arrives
+  let hasCachedData = false;
   (function loadCachedData() {
     try {
       const raw = localStorage.getItem(`pmCache_${currentTimePeriod}`);
@@ -1982,6 +1986,7 @@
       const ageStr = ageMin < 1 ? 'just now' : ageMin < 60 ? `${ageMin}m ago` : `${Math.round(ageMin/60)}h ago`;
       currentData = data;
       lastEnrichedPeriod = currentTimePeriod;
+      hasCachedData = true;
       document.getElementById('loadingOverlay').classList.add('hidden');
       document.getElementById('statusDot').style.background = 'var(--accent-amber)';
       document.getElementById('statusText').textContent = `Cached \u2022 ${ageStr} \u2022 refreshing\u2026`;
