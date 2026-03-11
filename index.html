@@ -596,6 +596,97 @@
 
   .polymarket-link:hover { text-decoration: underline; }
 
+  /* ── Trades modal ── */
+  .trades-btn {
+    background: rgba(99,179,237,0.12);
+    color: var(--accent-blue);
+    border: 1px solid rgba(99,179,237,0.3);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .trades-btn:hover { background: rgba(99,179,237,0.25); }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: min(860px, 95vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-header h3 { margin: 0; font-size: 16px; }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+  }
+  .modal-close:hover { color: var(--text-primary); }
+  .modal-body {
+    overflow-y: auto;
+    padding: 16px 24px 24px;
+  }
+  .modal-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+  }
+  .trades-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .trades-table th {
+    text-align: left;
+    padding: 8px 10px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .trades-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid rgba(42,58,84,0.3);
+    vertical-align: middle;
+  }
+  .trades-table tr:last-child td { border-bottom: none; }
+  .trades-table .market-name {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .trade-win  { color: var(--accent-green); font-weight: 600; }
+  .trade-loss { color: var(--accent-red);   font-weight: 600; }
+  .trade-open { color: var(--accent-amber); font-weight: 600; }
+
   .footer {
     text-align: center;
     padding: 24px;
@@ -854,6 +945,19 @@
           <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading data...</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Trades modal -->
+<div class="modal-overlay" id="tradesModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="tradesModalTitle">Trades</h3>
+      <button class="modal-close" id="tradesModalClose">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="tradesModalBody">
+      <div class="modal-loading">Loading trades…</div>
     </div>
   </div>
 </div>
@@ -1702,11 +1806,146 @@
         <td style="font-size:13px;color:var(--text-secondary)">${marketsStr}</td>
         <td class="${roiClass}" style="font-size:13px">${roiStr}</td>
         <td style="font-size:13px;color:var(--text-secondary)">${t.daysSinceActive !== null && t.daysSinceActive !== undefined ? (t.daysSinceActive === 0 ? 'Today' : t.daysSinceActive + 'd ago') : '--'}</td>
-        <td>
-          <a href="${profileUrl}" target="_blank" class="polymarket-link">View &#8599;</a>
+        <td style="white-space:nowrap">
+          <button class="trades-btn" onclick="openTradesModal('${t.proxyWallet}','${name.replace(/'/g,"\\'")}')">Trades</button>
+          <a href="${profileUrl}" target="_blank" class="polymarket-link" style="margin-left:8px">View &#8599;</a>
         </td>
       </tr>`;
     }).join('');
+  }
+
+  // --- Trades modal ---
+  document.getElementById('tradesModalClose').addEventListener('click', () => {
+    document.getElementById('tradesModal').classList.remove('open');
+  });
+  document.getElementById('tradesModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+  });
+
+  async function openTradesModal(address, name) {
+    const modal = document.getElementById('tradesModal');
+    const body  = document.getElementById('tradesModalBody');
+    document.getElementById('tradesModalTitle').textContent = `Trades — ${name} (${currentTimePeriod === 'ALL' ? 'All Time' : currentTimePeriod})`;
+    body.innerHTML = '<div class="modal-loading">Loading trades…</div>';
+    modal.classList.add('open');
+
+    try {
+      const trades = await fetchTradesForModal(address);
+      if (!trades.length) {
+        body.innerHTML = '<div class="modal-loading">No trades found for this period.</div>';
+        return;
+      }
+      body.innerHTML = `
+        <table class="trades-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Market</th>
+              <th>Side</th>
+              <th>Result</th>
+              <th style="text-align:right">P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${trades.map(tr => {
+              const dateStr = tr.ts ? new Date(tr.ts * 1000).toLocaleString(undefined, {month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+              const pnlVal = tr.pnl ?? null;
+              const pnlStr = pnlVal !== null ? (pnlVal >= 0 ? '+' : '') + '$' + Math.abs(pnlVal).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—';
+              const resultClass = tr.result === 'Win' ? 'trade-win' : tr.result === 'Loss' ? 'trade-loss' : 'trade-open';
+              return `<tr>
+                <td style="color:var(--text-secondary);white-space:nowrap">${dateStr}</td>
+                <td><div class="market-name" title="${tr.market}">${tr.market}</div></td>
+                <td style="color:var(--text-secondary)">${tr.side || '—'}</td>
+                <td class="${resultClass}">${tr.result}</td>
+                <td style="text-align:right" class="${pnlVal !== null ? (pnlVal >= 0 ? 'pnl-positive' : 'pnl-negative') : ''}">${pnlStr}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    } catch (e) {
+      body.innerHTML = `<div class="modal-loading" style="color:var(--accent-red)">Failed to load trades: ${e.message}</div>`;
+    }
+  }
+
+  async function fetchTradesForModal(address) {
+    const nowTs = Date.now() / 1000;
+    const cutoffTs = currentTimePeriod === 'ALL' ? 0 : nowTs - periodSeconds(currentTimePeriod);
+    const PAGE = 500;
+    const trades = [];
+
+    // ── Closed (redeemed) positions ──
+    let offset = 0;
+    while (true) {
+      const r = await fetch(`${API_BASE}/closed-positions?user=${address}&sortBy=TIMESTAMP&sortDirection=DESC&limit=${PAGE}&offset=${offset}`).catch(() => null);
+      if (!r || !r.ok) break;
+      const rows = await r.json();
+      if (!Array.isArray(rows) || !rows.length) break;
+      let done = false;
+      for (const p of rows) {
+        const ts = p.timestamp || p.endDate
+          ? (p.timestamp
+              ? (typeof p.timestamp === 'number' ? p.timestamp : Math.floor(new Date(p.timestamp).getTime()/1000))
+              : Math.floor(new Date(p.endDate.includes('T') ? p.endDate : p.endDate + 'T00:00:00Z').getTime()/1000))
+          : 0;
+        if (currentTimePeriod !== 'ALL' && ts > 0 && ts < cutoffTs) { done = true; break; }
+        if (currentTimePeriod === 'ALL' || ts === 0 || ts >= cutoffTs) {
+          const pnl = Number(p.realizedPnl ?? p.cashPnl ?? 0);
+          trades.push({
+            ts,
+            market: p.title || p.question || p.market || 'Unknown market',
+            side: p.outcome || p.side || null,
+            result: pnl > 0 ? 'Win' : pnl < 0 ? 'Loss' : 'Break even',
+            pnl,
+          });
+        }
+      }
+      if (done || rows.length < PAGE) break;
+      offset += PAGE;
+    }
+
+    // ── Open / unredeemed resolved positions ──
+    const r2 = await fetch(`${API_BASE}/positions?user=${address}&sizeThreshold=.1`).catch(() => null);
+    if (r2 && r2.ok) {
+      const active = await r2.json().catch(() => []);
+      if (Array.isArray(active)) {
+        active.forEach(p => {
+          const curPrice = Number(p.curPrice ?? 1);
+          const endDateStr = p.endDate;
+          const endTs = endDateStr
+            ? Math.floor(new Date(endDateStr.includes('T') ? endDateStr : endDateStr + 'T00:00:00Z').getTime()/1000)
+            : 0;
+          const rawTs = p.timestamp || p.createdAt || p.startDate || p.dateOpened || p.openDate;
+          const openTs = rawTs ? (typeof rawTs === 'number' ? rawTs : Math.floor(new Date(rawTs).getTime()/1000)) : 0;
+          const isResolved = endTs > 0 && endTs < nowTs;
+          const posTs = isResolved ? endTs : openTs;
+
+          if (currentTimePeriod !== 'ALL' && posTs > 0 && posTs < cutoffTs) return;
+
+          const pnl = Number(p.cashPnl || 0);
+          let result;
+          if (!isResolved) result = 'Open';
+          else if (curPrice <= 0.01) result = 'Loss';
+          else result = pnl > 0 ? 'Win' : 'Loss';
+
+          trades.push({
+            ts: posTs,
+            market: p.title || p.question || p.market || 'Unknown market',
+            side: p.outcome || p.side || null,
+            result,
+            pnl: isResolved ? pnl : null,
+          });
+        });
+      }
+    }
+
+    // Sort newest first
+    trades.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    return trades;
+  }
+
+  function periodSeconds(period) {
+    const map = { DAY: 86400, WEEK: 604800, MONTH: 2592000, '6MONTHS': 15552000, YEAR: 31536000 };
+    return map[period] || 2592000;
   }
 
   // --- Init ---
