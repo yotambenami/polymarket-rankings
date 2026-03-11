@@ -1393,6 +1393,14 @@
       lastEnrichedPeriod = currentTimePeriod;
       currentData = traders;
 
+      // Persist to cache so next page-load is instant
+      try {
+        localStorage.setItem(`pmCache_${currentTimePeriod}`, JSON.stringify({
+          ts: Date.now(),
+          data: traders
+        }));
+      } catch (e) { /* storage full or private mode — ignore */ }
+
       statusDot.style.background = 'var(--accent-green)';
       statusText.textContent = `Live \u2022 ${new Date().toLocaleTimeString()}`;
       document.getElementById('loadingOverlay').classList.add('hidden');
@@ -1950,6 +1958,27 @@
 
   // --- Init ---
   setupFilters();
+
+  // Try to render cached data instantly before the live fetch arrives
+  (function loadCachedData() {
+    try {
+      const raw = localStorage.getItem(`pmCache_${currentTimePeriod}`);
+      if (!raw) return;
+      const { ts, data } = JSON.parse(raw);
+      if (!Array.isArray(data) || !data.length) return;
+      const ageMin = Math.round((Date.now() - ts) / 60000);
+      const ageStr = ageMin < 1 ? 'just now' : ageMin < 60 ? `${ageMin}m ago` : `${Math.round(ageMin/60)}h ago`;
+      currentData = data;
+      lastEnrichedPeriod = currentTimePeriod;
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      document.getElementById('statusDot').style.background = 'var(--accent-amber)';
+      document.getElementById('statusText').textContent = `Cached \u2022 ${ageStr} \u2022 refreshing\u2026`;
+      updateStats();
+      renderCharts();
+      renderTable();
+    } catch (e) { /* corrupt cache — ignore */ }
+  })();
+
   fetchData();
 </script>
 </body>
