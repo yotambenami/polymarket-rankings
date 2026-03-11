@@ -1466,7 +1466,7 @@
       document.getElementById('statTopVolName').textContent = volSorted[0].userName || shortenAddr(volSorted[0].proxyWallet);
 
       // Best Win Rate
-      const withWin = statsPool.filter(t => t.winPct !== null && t.marketsTraded >= 5);
+      const withWin = statsPool.filter(t => t.winPct != null && t.marketsTraded >= 5);
       if (withWin.length > 0) {
         const bestWin = withWin.sort((a, b) => b.winPct - a.winPct)[0];
         document.getElementById('statBestWin').textContent = bestWin.winPct.toFixed(1) + '%';
@@ -1511,7 +1511,7 @@
 
     if (currentSort === 'combo' && comboSortMetrics.length > 0) {
       // Reuse combo sort logic
-      let comboData = pool.filter(t => t.winPct !== null || !comboSortMetrics.includes('winPct'));
+      let comboData = pool.filter(t => t.winPct != null || !comboSortMetrics.includes('winPct'));
       const n = comboData.length;
       if (n > 1) {
         const metricGetters = { pnl: t => t.pnl, winPct: t => t.winPct || 0, vol: t => t.vol, roi: t => t.roi, markets: t => t.marketsTraded || 0 };
@@ -1536,7 +1536,7 @@
       chartMode = comboSortMetrics[0] || 'pnl';
     } else if (currentSort === 'winPct') {
       // For the chart only show traders with real win data (otherwise bar at 0% is misleading)
-      sorted = pool.filter(t => t.winPct !== null && t.marketsTraded >= 1).sort((a, b) => b.winPct - a.winPct).slice(0, 20);
+      sorted = pool.filter(t => t.winPct != null && t.marketsTraded >= 1).sort((a, b) => b.winPct - a.winPct).slice(0, 20);
       // If too few have data, fall back to showing all by PnL so chart isn't nearly empty
       if (sorted.length < 5) sorted = pool.sort((a, b) => b.pnl - a.pnl).slice(0, 20);
       chartLabel = 'Win %';
@@ -1611,7 +1611,7 @@
     const scatterCtx = document.getElementById('scatterChart').getContext('2d');
     if (scatterChart) scatterChart.destroy();
 
-    const scatterData = sorted.filter(t => t.winPct !== null);
+    const scatterData = sorted.filter(t => t.winPct != null);
     if (scatterData.length > 3) {
       // Win % vs PnL scatter
       document.querySelector('#scatterChart').closest('.chart-card').querySelector('.chart-title').innerHTML =
@@ -1699,7 +1699,7 @@
     // Sort by current tab
     if (currentSort === 'combo' && comboSortMetrics.length > 0) {
       // Combined ranking: normalize each metric to percentile, then average ranks
-      data = data.filter(t => t.winPct !== null || !comboSortMetrics.includes('winPct'));
+      data = data.filter(t => t.winPct != null || !comboSortMetrics.includes('winPct'));
       const n = data.length;
       if (n > 1) {
         // For each metric, assign a rank (0 = best, n-1 = worst)
@@ -1739,8 +1739,8 @@
     } else if (currentSort === 'winPct') {
       // Sort: traders with real win data first (high→low), then those without data at bottom
       data.sort((a, b) => {
-        const aHas = a.winPct !== null && a.marketsTraded >= 1;
-        const bHas = b.winPct !== null && b.marketsTraded >= 1;
+        const aHas = a.winPct != null && a.marketsTraded >= 1;
+        const bHas = b.winPct != null && b.marketsTraded >= 1;
         if (aHas && bHas) return b.winPct - a.winPct;
         if (aHas) return -1;   // a has data → comes first
         if (bHas) return 1;    // b has data → comes first
@@ -1766,7 +1766,7 @@
 
       // Win % display
       let winPctStr, winPctColor;
-      if (t.winPct !== null) {
+      if (t.winPct != null) {
         winPctStr = t.winPct.toFixed(1) + '%';
         winPctColor = t.winPct >= 60 ? 'var(--accent-green)' : t.winPct >= 45 ? 'var(--accent-amber)' : 'var(--accent-red)';
       } else {
@@ -1774,7 +1774,7 @@
         winPctColor = 'var(--text-secondary)';
       }
 
-      const winBarPct = t.winPct !== null ? Math.min(t.winPct, 100) : 0;
+      const winBarPct = t.winPct != null ? Math.min(t.winPct, 100) : 0;
 
       // Markets traded display
       const marketsStr = t.marketsTraded > 0
