@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PnL vs. Win Rate: What the Leaderboard Actually Tells You — Polymarket Rankings</title>
+<meta name="description" content="A trader with a 90% win rate isn't necessarily better than one with 55%. Understanding these two metrics is one of the most misunderstood parts of prediction market analysis.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://polymarketrankings.com/blog/pnl-vs-win-rate.html">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://polymarketrankings.com/blog/pnl-vs-win-rate.html">
+<meta property="og:title" content="PnL vs. Win Rate: What the Leaderboard Actually Tells You">
+<meta property="og:description" content="A trader with a 90% win rate isn't necessarily better than one with 55%. Understanding these two metrics is one of the most misunderstood parts of prediction market analysis.">
+<meta property="og:site_name" content="Polymarket Rankings">
+<meta name="theme-color" content="#0a0e17">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<style>
+  :root { --bg-primary: #0a0e17; --bg-secondary: #111827; --bg-card: #1a2235; --bg-hover: #243049; --border: #2a3a54; --text-primary: #e8ecf4; --text-secondary: #8b95a8; --accent-blue: #3b82f6; --accent-green: #22c55e; --accent-purple: #a855f7; --accent-amber: #f59e0b; --accent-red: #ef4444; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; }
+  .header { background: linear-gradient(135deg, #1a2235 0%, #0f172a 100%); border-bottom: 1px solid var(--border); padding: 24px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .logo { width: 40px; height: 40px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700; text-decoration: none; color: white; }
+  .site-title { font-size: 22px; font-weight: 700; background: linear-gradient(90deg, var(--text-primary), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; }
+  .nav-links { display: flex; gap: 12px; align-items: center; }
+  .nav-link { color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); transition: all 0.2s; }
+  .nav-link:hover { color: var(--text-primary); border-color: var(--accent-blue); background: var(--bg-hover); }
+  .article-wrap { max-width: 720px; margin: 0 auto; padding: 60px 32px 100px; }
+  .article-tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; background: rgba(168,85,247,0.15); color: var(--accent-purple); margin-bottom: 20px; }
+  h1 { font-size: 36px; font-weight: 800; line-height: 1.2; margin-bottom: 16px; }
+  .article-meta { font-size: 14px; color: var(--text-secondary); margin-bottom: 40px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+  .article-meta span { margin-right: 16px; }
+  .article-body { font-size: 17px; line-height: 1.8; color: #d1d8e8; }
+  .article-body p { margin-bottom: 24px; }
+  .article-body h2 { font-size: 24px; font-weight: 700; color: var(--text-primary); margin: 44px 0 16px; }
+  .article-body strong { color: var(--text-primary); font-weight: 600; }
+  .article-body em { color: var(--accent-amber); font-style: normal; font-weight: 500; }
+  .callout { background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--accent-amber); border-radius: 10px; padding: 20px 24px; margin: 32px 0; font-size: 16px; color: var(--text-secondary); }
+  .callout strong { color: var(--accent-amber); display: block; margin-bottom: 6px; }
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 32px 0; }
+  .compare-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .compare-card .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 10px; }
+  .compare-card .label.green { color: var(--accent-green); }
+  .compare-card .label.amber { color: var(--accent-amber); }
+  .compare-card p { font-size: 15px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-blue); text-decoration: none; font-size: 14px; font-weight: 500; margin-bottom: 48px; }
+  .back-link:hover { text-decoration: underline; }
+  footer { border-top: 1px solid var(--border); padding: 32px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+  footer a { color: var(--accent-blue); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <a href="/" class="logo">P</a>
+    <a href="/" class="site-title">Polymarket Rankings</a>
+  </div>
+  <nav class="nav-links">
+    <a href="/blog/" class="nav-link">Blog</a>
+    <a href="/" class="nav-link">← Live Dashboard</a>
+  </nav>
+</header>
+
+<article class="article-wrap">
+  <a href="/blog/" class="back-link">← All articles</a>
+  <span class="article-tag">Analysis</span>
+  <h1>PnL vs. Win Rate: What the Leaderboard Actually Tells You</h1>
+  <div class="article-meta">
+    <span>March 10, 2026</span>
+    <span>6 min read</span>
+  </div>
+
+  <div class="article-body">
+
+    <p>When you look at the Polymarket leaderboard, two numbers dominate the conversation: total profit and loss (PnL) and win rate. They feel like they should tell the same story — a good trader wins a lot and makes money. But in practice, they can diverge dramatically, and understanding why is essential to reading what the leaderboard actually means.</p>
+
+    <h2>The Trader With a 90% Win Rate Who's Barely Profitable</h2>
+
+    <p>Imagine a trader who has completed 50 markets. They've won 45 of them — a 90% win rate. Impressive. But look at the position sizes: each win returned $50, while each of the 5 losses cost $800. The result is $2,250 in wins and $4,000 in losses — a net loss of $1,750 despite winning 9 out of 10 bets.</p>
+
+    <p>This pattern is more common than it sounds. It emerges naturally when traders hunt for "safe" positions — buying contracts already at 85–90% to lock in near-certain wins. These positions win frequently but return very little. When they do lose, it's because something genuinely surprising happened, and the loss is proportionally large given the high entry price.</p>
+
+    <div class="callout">
+      <strong>The trap</strong>
+      A high win rate achieved by taking small, near-certain positions is essentially selling insurance. You collect premiums constantly and look great on the win rate metric — until the rare catastrophic event wipes out many multiples of those gains.
+    </div>
+
+    <h2>The Trader With a 55% Win Rate Who's Crushing the Leaderboard</h2>
+
+    <p>Now consider someone who wins 55 out of 100 markets. Below average? Hardly. If their average winning trade returns $500 and their average losing trade costs $200, they've generated $27,500 in wins and $9,000 in losses — a $18,500 profit. With a win rate that looks mediocre.</p>
+
+    <p>This is closer to what the best Polymarket traders actually look like. They're not hunting for certainty — they're hunting for <em>edge</em>. They enter markets where their estimated probability is meaningfully higher than the current market price, which typically means entering at prices well below 90 cents. More of those bets will lose compared to the high-certainty trader, but the ones that win pay out much more.</p>
+
+    <h2>What PnL Tells You (And What It Doesn't)</h2>
+
+    <p>Total PnL is the most honest summary number on the leaderboard. It captures the actual result of someone's trading — all the wins, all the losses, all the fees. If someone is at the top of the PnL rankings over a meaningful time period, they are genuinely good at this, full stop.</p>
+
+    <p>What PnL doesn't tell you: how many markets they traded, whether those returns are replicable, or whether they got lucky on a handful of large bets. A trader who made $500K on a single political prediction and then lost steadily on everything else looks great in PnL but terrible in edge per market.</p>
+
+    <div class="compare-grid">
+      <div class="compare-card">
+        <div class="label green">PnL tells you</div>
+        <p>Total dollars made or lost. The final score. The most relevant metric if you're trying to understand who is rich from this.</p>
+      </div>
+      <div class="compare-card">
+        <div class="label amber">Win rate tells you</div>
+        <p>How often someone is right directionally. Useful context, but meaningless without knowing average win size vs. average loss size.</p>
+      </div>
+    </div>
+
+    <h2>What Win Rate Tells You (And What It Doesn't)</h2>
+
+    <p>Win rate is useful as a signal of calibration — specifically, whether a trader is consistently right about the direction of outcomes. A win rate consistently above 55% over hundreds of markets is hard to achieve by luck and suggests genuine forecasting skill.</p>
+
+    <p>But win rate alone is misleading without the context of position sizes. The leaderboard on this site shows both metrics together, along with the raw count of markets traded — which helps triangulate the picture. A 70% win rate over 8 markets is noise. A 62% win rate over 200 markets is signal.</p>
+
+    <h2>The Metric That Actually Matters: Expected Value Per Dollar Risked</h2>
+
+    <p>Neither PnL nor win rate alone captures what sophisticated traders focus on: expected value relative to capital risked. This is sometimes expressed as ROI (return on investment) — how much did you earn per dollar deployed.</p>
+
+    <p>A trader who made $100K by risking $50K has generated a 200% ROI. A trader who made $200K by risking $2M has generated a 10% ROI. The leaderboard's PnL column ranks them in the opposite order from their actual efficiency.</p>
+
+    <p>When you're studying the leaderboard looking for traders to learn from, the most informative profiles are those with strong ROI over a high number of markets — not necessarily the top PnL earners, who may simply be deploying enormous capital.</p>
+
+    <h2>How to Read the Leaderboard Holistically</h2>
+
+    <p>The most useful way to interpret the leaderboard is to look at all three metrics together: PnL (total value generated), win rate (directional accuracy), and markets traded (sample size). A trader who is high on all three — say, top 20 by PnL, 60%+ win rate, and 100+ markets traded — is almost certainly a genuine edge player, not a lucky variance winner.</p>
+
+    <p>Conversely, a trader at the top of win rate with only 5–10 markets is almost certainly just variance. With a small enough sample, 100% win rates are expected by chance. The leaderboard on this site filters the top stat card to traders with at least 5 markets for this reason — a 100% win rate from 2 trades tells you essentially nothing.</p>
+
+  </div>
+</article>
+
+<footer>
+  <p><a href="/">Polymarket Rankings</a> · <a href="/blog/">Blog</a></p>
+</footer>
+
+</body>
+</html>

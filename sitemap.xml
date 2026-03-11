@@ -6,4 +6,40 @@
           <changefreq>hourly</changefreq>
           <priority>1.0</priority>
     </url>
+    <url>
+          <loc>https://polymarketrankings.com/blog/</loc>
+          <lastmod>2026-03-10</lastmod>
+          <changefreq>weekly</changefreq>
+          <priority>0.8</priority>
+    </url>
+    <url>
+          <loc>https://polymarketrankings.com/blog/how-top-traders-make-money.html</loc>
+          <lastmod>2026-03-10</lastmod>
+          <changefreq>monthly</changefreq>
+          <priority>0.7</priority>
+    </url>
+    <url>
+          <loc>https://polymarketrankings.com/blog/prediction-market-inefficiencies.html</loc>
+          <lastmod>2026-03-10</lastmod>
+          <changefreq>monthly</changefreq>
+          <priority>0.7</priority>
+    </url>
+    <url>
+          <loc>https://polymarketrankings.com/blog/pnl-vs-win-rate.html</loc>
+          <lastmod>2026-03-10</lastmod>
+          <changefreq>monthly</changefreq>
+          <priority>0.7</priority>
+    </url>
+    <url>
+          <loc>https://polymarketrankings.com/blog/psychology-of-prediction-markets.html</loc>
+          <lastmod>2026-03-10</lastmod>
+          <changefreq>monthly</changefreq>
+          <priority>0.7</priority>
+    </url>
+    <url>
+          <loc>https://polymarketrankings.com/blog/getting-started-on-polymarket.html</loc>
+          <lastmod>2026-03-10</lastmod>
+          <changefreq>monthly</changefreq>
+          <priority>0.7</priority>
+    </url>
 </urlset>
