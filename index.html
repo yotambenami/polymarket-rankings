@@ -1253,7 +1253,7 @@
     const BATCH_SIZE = 10; // higher = faster but more parallel API calls
     const enriched = [...traders];
 
-    document.getElementById('statusText').textContent = 'Enriching win stats...';
+    document.getElementById('statusText').textContent = 'Loading win rates & ROI...';
 
     for (let i = 0; i < enriched.length; i += BATCH_SIZE) {
       // Bail if a newer fetchData() has started
@@ -1389,7 +1389,7 @@
       lastEnrichedPeriod = currentTimePeriod;
       document.getElementById('loadingOverlay').classList.add('hidden');
       statusDot.style.background = 'var(--accent-amber)';
-      statusText.textContent = 'Loading win stats\u2026';
+      statusText.textContent = 'Loading win rates & ROI (300 traders)\u2026';
       if (!hasCachedData) {
         updateStats();
         renderCharts();
@@ -1398,15 +1398,18 @@
 
       if (mySeq !== fetchSeq) return;
 
-      // ── Enrich top 50 in the background ──
+      // ── Enrich top 300 in the background ──
       // Progressive renders happen inside enrichWithWinStats after each batch.
-      const ENRICH_LIMIT = 50;
+      // We enrich 300 (vs the old 50) so that sorting by win rate / ROI draws
+      // from a large enough pool to be genuinely meaningful — not just a
+      // reranking of the top PnL traders.
+      const ENRICH_LIMIT = 300;
       traders.sort((a, b) => (a.pnlRank || 9999) - (b.pnlRank || 9999));
       const toEnrich = traders.slice(0, ENRICH_LIMIT);
       const remainder = traders.slice(ENRICH_LIMIT);
-      const enriched50 = await enrichWithWinStats(toEnrich, currentTimePeriod, mySeq);
+      const enriched300 = await enrichWithWinStats(toEnrich, currentTimePeriod, mySeq);
       if (mySeq !== fetchSeq) return;
-      traders = [...enriched50, ...remainder];
+      traders = [...enriched300, ...remainder];
       traders.sort((a, b) => b.pnl - a.pnl);
       lastEnrichedPeriod = currentTimePeriod;
       currentData = traders;
