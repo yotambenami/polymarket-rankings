@@ -1248,13 +1248,16 @@
   }
 
   // Enrich traders with win stats (batched with concurrency limit)
-  async function enrichWithWinStats(traders, timePeriod) {
-    const BATCH_SIZE = 5;  // balance speed vs. API rate-limits
+  async function enrichWithWinStats(traders, timePeriod, seqRef) {
+    const BATCH_SIZE = 10; // higher = faster but more parallel API calls
     const enriched = [...traders];
 
     document.getElementById('statusText').textContent = 'Enriching win stats...';
 
     for (let i = 0; i < enriched.length; i += BATCH_SIZE) {
+      // Bail if a newer fetchData() has started
+      if (seqRef && fetchSeq !== seqRef) return enriched;
+
       const batch = enriched.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
         batch.map(t => getTraderWinStats(t.proxyWallet, timePeriod))
@@ -1297,9 +1300,14 @@
         }
       });
 
-      // Update progress
+      // Progressive render — show results as each batch lands
       const pct = Math.min(100, Math.round(((i + BATCH_SIZE) / enriched.length) * 100));
-      document.getElementById('statusText').textContent = `Enriching win stats... ${pct}%`;
+      document.getElementById('statusText').textContent = `Updating... ${pct}%`;
+      currentData = [...enriched].sort((a, b) => b.pnl - a.pnl);
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      renderTable();
+      renderCharts();
+      updateStats();
     }
 
     return enriched;
@@ -1373,14 +1381,15 @@
         return { ...t, roi, marketsTraded: leaderboardTrades };
       });
 
-      // Enrich only the top traders — enriching all 1000 would take ~6 minutes.
-      // Sort by leaderboard PNL rank first so we enrich the most promising ones.
-      const ENRICH_LIMIT = 150;
+      // Enrich only the top traders — the table shows 20, charts show 20,
+      // so enriching 50 gives enough buffer for filters to find genuine winners.
+      // The remaining 950 keep leaderboard PnL as a fallback.
+      const ENRICH_LIMIT = 50;
       traders.sort((a, b) => (a.pnlRank || 9999) - (b.pnlRank || 9999));
       const toEnrich = traders.slice(0, ENRICH_LIMIT);
       const remainder = traders.slice(ENRICH_LIMIT);
-      const enriched150 = await enrichWithWinStats(toEnrich, currentTimePeriod);
-      traders = [...enriched150, ...remainder];
+      const enriched50 = await enrichWithWinStats(toEnrich, currentTimePeriod, mySeq);
+      traders = [...enriched50, ...remainder];
 
       // Bail out if a newer fetch started while enrichment was running
       if (mySeq !== fetchSeq) return;
