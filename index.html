@@ -1381,28 +1381,34 @@
         return { ...t, roi, marketsTraded: leaderboardTrades };
       });
 
-      // Enrich only the top traders — the table shows 20, charts show 20,
-      // so enriching 50 gives enough buffer for filters to find genuine winners.
-      // The remaining 950 keep leaderboard PnL as a fallback.
+      // ── Show raw leaderboard data immediately ──
+      // Gives the user an instant first render; win stats fill in below.
+      traders.sort((a, b) => b.pnl - a.pnl);
+      currentData = traders;
+      lastEnrichedPeriod = currentTimePeriod;
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      statusDot.style.background = 'var(--accent-amber)';
+      statusText.textContent = 'Loading win stats\u2026';
+      updateStats();
+      renderCharts();
+      renderTable();
+
+      if (mySeq !== fetchSeq) return;
+
+      // ── Enrich top 50 in the background ──
+      // Progressive renders happen inside enrichWithWinStats after each batch.
       const ENRICH_LIMIT = 50;
       traders.sort((a, b) => (a.pnlRank || 9999) - (b.pnlRank || 9999));
       const toEnrich = traders.slice(0, ENRICH_LIMIT);
       const remainder = traders.slice(ENRICH_LIMIT);
       const enriched50 = await enrichWithWinStats(toEnrich, currentTimePeriod, mySeq);
-      traders = [...enriched50, ...remainder];
-
-      // Bail out if a newer fetch started while enrichment was running
       if (mySeq !== fetchSeq) return;
-
-      // Sort the pool by true enriched PnL so genuine winners float to the
-      // top regardless of how the leaderboard originally ordered them.
-      // Filters and re-sorts in renderTable/renderCharts work on this pool.
+      traders = [...enriched50, ...remainder];
       traders.sort((a, b) => b.pnl - a.pnl);
-
       lastEnrichedPeriod = currentTimePeriod;
       currentData = traders;
 
-      // Persist to cache so next page-load is instant
+      // Persist fully-enriched data to cache
       try {
         localStorage.setItem(`pmCache_${currentTimePeriod}`, JSON.stringify({
           ts: Date.now(),
@@ -1412,8 +1418,6 @@
 
       statusDot.style.background = 'var(--accent-green)';
       statusText.textContent = `Live \u2022 ${new Date().toLocaleTimeString()}`;
-      document.getElementById('loadingOverlay').classList.add('hidden');
-
       updateStats();
       renderCharts();
       renderTable();
