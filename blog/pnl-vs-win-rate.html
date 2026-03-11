@@ -47,7 +47,42 @@
   .back-link:hover { text-decoration: underline; }
   footer { border-top: 1px solid var(--border); padding: 32px; text-align: center; color: var(--text-secondary); font-size: 13px; }
   footer a { color: var(--accent-blue); text-decoration: none; }
+
+  .related-section { margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--border); }
+  .related-section h2 { font-size: 18px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 20px; }
+  .related-links { display: flex; flex-direction: column; gap: 12px; }
+  .related-link { display: block; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; text-decoration: none; color: var(--text-primary); font-size: 15px; font-weight: 500; transition: all 0.2s; }
+  .related-link:hover { border-color: var(--accent-blue); background: var(--bg-hover); }
+  .related-link span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-blue); display: block; margin-bottom: 4px; }
 </style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "PnL vs. Win Rate: What the Leaderboard Actually Tells You",
+  "description": "A trader with a 90% win rate isn't necessarily better than one with 55%. Understanding these two metrics is one of the most misunderstood parts of prediction market analysis.",
+  "url": "https://polymarketrankings.com/blog/pnl-vs-win-rate.html",
+  "datePublished": "2026-03-10",
+  "dateModified": "2026-03-10",
+  "author": {
+    "@type": "Organization",
+    "name": "Polymarket Rankings",
+    "url": "https://polymarketrankings.com"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Polymarket Rankings",
+    "url": "https://polymarketrankings.com"
+  },
+  "keywords": "Polymarket PnL, win rate, leaderboard, prediction market metrics, trading performance",
+  "isPartOf": {
+    "@type": "Blog",
+    "name": "Polymarket Rankings Blog",
+    "url": "https://polymarketrankings.com/blog/"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -130,6 +165,15 @@
     <p>Conversely, a trader at the top of win rate with only 5–10 markets is almost certainly just variance. With a small enough sample, 100% win rates are expected by chance. The leaderboard on this site filters the top stat card to traders with at least 5 markets for this reason — a 100% win rate from 2 trades tells you essentially nothing.</p>
 
   </div>
+
+<section class="related-section">
+  <h2>Related Articles</h2>
+  <div class="related-links">
+  <a href="/blog/how-top-traders-make-money.html" class="related-link"><span>Read next</span>How Polymarket's Top Traders Actually Make Money</a>
+  <a href="/blog/prediction-market-inefficiencies.html" class="related-link"><span>Read next</span>5 Persistent Inefficiencies in Prediction Markets</a>
+  <a href="/blog/getting-started-on-polymarket.html" class="related-link"><span>Read next</span>Getting Started on Polymarket: What New Traders Get Wrong</a>
+  </div>
+</section>
 </article>
 
 <footer>

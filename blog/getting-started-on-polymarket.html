@@ -44,7 +44,42 @@
   .back-link:hover { text-decoration: underline; }
   footer { border-top: 1px solid var(--border); padding: 32px; text-align: center; color: var(--text-secondary); font-size: 13px; }
   footer a { color: var(--accent-blue); text-decoration: none; }
+
+  .related-section { margin-top: 56px; padding-top: 40px; border-top: 1px solid var(--border); }
+  .related-section h2 { font-size: 18px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 20px; }
+  .related-links { display: flex; flex-direction: column; gap: 12px; }
+  .related-link { display: block; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; text-decoration: none; color: var(--text-primary); font-size: 15px; font-weight: 500; transition: all 0.2s; }
+  .related-link:hover { border-color: var(--accent-blue); background: var(--bg-hover); }
+  .related-link span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-blue); display: block; margin-bottom: 4px; }
 </style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Getting Started on Polymarket: What New Traders Get Wrong",
+  "description": "Most new Polymarket traders make the same mistakes in their first few weeks. Here's what to know before you start, based on what actually separates profitable traders from the rest.",
+  "url": "https://polymarketrankings.com/blog/getting-started-on-polymarket.html",
+  "datePublished": "2026-03-10",
+  "dateModified": "2026-03-10",
+  "author": {
+    "@type": "Organization",
+    "name": "Polymarket Rankings",
+    "url": "https://polymarketrankings.com"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Polymarket Rankings",
+    "url": "https://polymarketrankings.com"
+  },
+  "keywords": "getting started Polymarket, Polymarket beginner guide, prediction market tips, how to trade Polymarket",
+  "isPartOf": {
+    "@type": "Blog",
+    "name": "Polymarket Rankings Blog",
+    "url": "https://polymarketrankings.com/blog/"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -76,31 +111,31 @@
 
     <div class="mistake-block">
       <div class="mistake-label">Mistake #1</div>
-      <div class="mistake-title">Trading on opinion, not probability</div>
+      <h3 class="mistake-title">Trading on opinion, not probability</h3>
       <p>The most common failure mode: entering a market because you have a strong opinion about the outcome, not because you think the market price is wrong. These are different things. If you're 70% sure something will happen and the market is at 70%, there's no edge — you're just taking on variance for no expected gain. You need to disagree with the market price, not just have an opinion about the underlying event.</p>
     </div>
 
     <div class="mistake-block">
       <div class="mistake-label">Mistake #2</div>
-      <div class="mistake-title">Ignoring fees and spreads</div>
+      <h3 class="mistake-title">Ignoring fees and spreads</h3>
       <p>Polymarket charges fees on each trade, and the bid-ask spread on low-liquidity markets can be wide. A round trip (entering and exiting a position) in a thinly traded market can cost 3–5% before you've even taken on any directional risk. Many new traders don't factor this in, turning what looked like a marginal positive-EV trade into a losing one. Always check the depth of the order book before entering, and factor fees into your expected return calculation.</p>
     </div>
 
     <div class="mistake-block">
       <div class="mistake-label">Mistake #3</div>
-      <div class="mistake-title">Not reading the resolution criteria</div>
+      <h3 class="mistake-title">Not reading the resolution criteria</h3>
       <p>Polymarket contracts resolve based on specific, often narrow criteria — not your general sense of whether an event "happened." A contract about whether GDP growth "exceeds 2%" resolves on a specific data release, at a specific revision level, measured a specific way. Traders who don't read the resolution rules carefully often find themselves right about the underlying event but losing the contract due to a technicality they didn't notice. Always read the full resolution criteria before entering a position.</p>
     </div>
 
     <div class="mistake-block">
       <div class="mistake-label">Mistake #4</div>
-      <div class="mistake-title">Sizing positions by conviction, not edge</div>
+      <h3 class="mistake-title">Sizing positions by conviction, not edge</h3>
       <p>Feeling strongly about an outcome is not the same as having edge on the market price. New traders often put their largest positions on the outcomes they feel most certain about — which frequently are the outcomes that are already well-priced by the market. Proper position sizing should be proportional to how much your probability estimate diverges from the market, not how confident you feel. High conviction in an efficient market is worth nothing.</p>
     </div>
 
     <div class="mistake-block">
       <div class="mistake-label">Mistake #5</div>
-      <div class="mistake-title">Spreading too thin across categories</div>
+      <h3 class="mistake-title">Spreading too thin across categories</h3>
       <p>Prediction markets reward domain expertise. When you trade politics, you're competing against people who track every poll, every endorsement, every fundraising report. When you trade sports, you're up against sharp bettors with sophisticated models. Trading casually across many categories means you're always at an information disadvantage. New traders who pick one area and go deep almost always outperform those who scatter across everything.</p>
     </div>
 
@@ -120,6 +155,15 @@
     <p>Prediction markets have a reputation as zero-sum games where only a few professionals win. That's partially true — but the "professionals" on Polymarket aren't necessarily people with trading backgrounds. They're people who are rigorous, domain-specific, and honest about their own biases. Those are learnable skills, not innate talents.</p>
 
   </div>
+
+<section class="related-section">
+  <h2>Related Articles</h2>
+  <div class="related-links">
+  <a href="/blog/pnl-vs-win-rate.html" class="related-link"><span>Read next</span>PnL vs. Win Rate: What the Leaderboard Actually Tells You</a>
+  <a href="/blog/psychology-of-prediction-markets.html" class="related-link"><span>Read next</span>The Psychology of Prediction Markets: Why Most People Lose</a>
+  <a href="/blog/prediction-market-inefficiencies.html" class="related-link"><span>Read next</span>5 Persistent Inefficiencies in Prediction Markets</a>
+  </div>
+</section>
 </article>
 
 <footer>
