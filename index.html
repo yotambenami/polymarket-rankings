@@ -768,17 +768,6 @@
     <button class="filter-btn" data-value="WEATHER">Weather</button>
   </div>
 
-  <div class="filter-slider-group">
-    <label>Trades</label>
-    <div class="dual-range-wrap" id="tradesRangeWrap">
-      <div class="dual-range-track-bg"></div>
-      <div class="dual-range-track-fill" id="tradesTrackFill"></div>
-      <input type="range" class="dual-range" id="minTradesSlider" min="0" max="100" value="1" step="1">
-      <input type="range" class="dual-range" id="maxTradesSlider" min="0" max="100" value="100" step="5">
-    </div>
-    <span class="slider-value" id="minTradesValue">1–100+</span>
-  </div>
-
   <input type="text" class="search-box" id="searchBox" placeholder="Search trader name...">
 </div>
 
@@ -881,8 +870,8 @@
   let currentTimePeriod = 'MONTH';
   let currentCategory = 'OVERALL';
   let currentSort = 'pnl';
-  let minTrades = 1;
-  let maxTrades = 100;
+  let minTrades = 0;
+  let maxTrades = Infinity;
   let activeWithinMinDays = 0;   // kept for filter logic but slider is removed
   let activeWithinDays = 365;    // kept for filter logic but slider is removed
   let comboSortMetrics = [];  // ordered list of metrics for combined ranking
@@ -965,31 +954,6 @@
         renderCharts();
       });
     });
-
-    // Trades dual-range slider
-    const minTradesSlider = document.getElementById('minTradesSlider');
-    const maxTradesSlider = document.getElementById('maxTradesSlider');
-    const tradesVal = document.getElementById('minTradesValue');
-    function syncTradesSliders() {
-      let minVal = Number(minTradesSlider.value);
-      let maxVal = Number(maxTradesSlider.value);
-      // Prevent handles crossing
-      if (minVal > maxVal) { maxTradesSlider.value = minVal; maxVal = minVal; }
-      minTrades = minVal;
-      maxTrades = maxVal;
-      // When both handles are at the same spot, raise the min so it can be dragged left
-      minTradesSlider.style.zIndex = minVal >= maxVal ? '5' : '2';
-      maxTradesSlider.style.zIndex = minVal >= maxVal ? '2' : '5';
-      const maxLabel = maxTrades >= 100 ? '100+' : String(maxTrades);
-      tradesVal.textContent = minTrades + '–' + maxLabel;
-      updateDualRangeTrack('tradesTrackFill', minTrades, maxTrades, 0, 100);
-      renderTable();
-      renderCharts();
-      updateStats();
-    }
-    minTradesSlider.addEventListener('input', syncTradesSliders);
-    maxTradesSlider.addEventListener('input', syncTradesSliders);
-    updateDualRangeTrack('tradesTrackFill', 5, 30, 0, 100); // initial fill at default 5–30
 
     // Combined sort chips (multi-select, ordered)
     document.querySelectorAll('#sortComboPanel .sort-chip').forEach(chip => {
@@ -1360,9 +1324,7 @@
     });
     // Apply trades range filter — tc=0 means no data yet, always let through
     statsPool = statsPool.filter(t => {
-      const tc = t.marketsTraded || 0;
-      if (tc === 0) return true;
-      return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
+      return true; // trades filter removed
     });
     const sorted = statsPool.sort((a, b) => b.pnl - a.pnl);
     const top20 = sorted.slice(0, 20);
@@ -1408,9 +1370,7 @@
     // Apply trades range filter — tc=0 means no data yet, always let through
     let pool = [...currentData];
     pool = pool.filter(t => {
-      const tc = t.marketsTraded || 0;
-      if (tc === 0) return true;
-      return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
+      return true; // trades filter removed
     });
 
     // Apply activity range filter.
@@ -1597,9 +1557,7 @@
 
     // Apply trades range filter — tc=0 means no data yet, always let through
     data = data.filter(t => {
-      const tc = t.marketsTraded || 0;
-      if (tc === 0) return true;
-      return tc >= minTrades && (maxTrades >= 100 || tc <= maxTrades);
+      return true; // trades filter removed
     });
 
     // Apply activity range filter.
