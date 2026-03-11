@@ -1300,14 +1300,13 @@
         }
       });
 
-      // Progressive render — show results as each batch lands
+      // Progressive render — update table only so win rates populate row by row,
+      // but skip charts/stats until enrichment is done (avoids 5x chart redraws).
       const pct = Math.min(100, Math.round(((i + BATCH_SIZE) / enriched.length) * 100));
       document.getElementById('statusText').textContent = `Updating... ${pct}%`;
       currentData = [...enriched].sort((a, b) => b.pnl - a.pnl);
       document.getElementById('loadingOverlay').classList.add('hidden');
       renderTable();
-      renderCharts();
-      updateStats();
     }
 
     return enriched;
