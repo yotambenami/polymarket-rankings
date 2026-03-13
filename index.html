@@ -1177,19 +1177,12 @@
 
     document.getElementById('searchBox').addEventListener('input', () => renderTable());
 
-    // Favorites tab
+    // Favorites tab — proper tab (not a toggle)
     document.getElementById('favTabBtn').addEventListener('click', () => {
-      showFavoritesOnly = !showFavoritesOnly;
-      document.getElementById('favTabBtn').classList.toggle('active', showFavoritesOnly);
-      // Deactivate other sort tabs when entering favorites view
-      if (showFavoritesOnly) {
-        document.querySelectorAll('#rankingTabs .table-tab:not(#favTabBtn)').forEach(t => t.classList.remove('active'));
-      } else {
-        // Restore the previously active sort tab
-        document.querySelectorAll('#rankingTabs .table-tab').forEach(t => {
-          t.classList.toggle('active', t.dataset.sort === currentSort);
-        });
-      }
+      showFavoritesOnly = true;
+      document.querySelectorAll('#rankingTabs .table-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('favTabBtn').classList.add('active');
+      document.getElementById('sortComboPanel').style.display = 'none';
       renderTable();
     });
 
@@ -1635,7 +1628,6 @@
   // --- Charts ---
   function renderCharts() {
     let sorted;
-    let chartLabel;
     let chartMode = 'pnl'; // what the bar chart shows
 
     // Apply trades range filter — tc=0 means no data yet, always let through
@@ -1677,7 +1669,6 @@
         comboData.sort((a, b) => a._comboScore - b._comboScore);
       }
       sorted = comboData.slice(0, 20);
-      chartLabel = 'Combined Score';
       // Show the first selected metric in bar chart
       chartMode = comboSortMetrics[0] || 'pnl';
     } else if (currentSort === 'winPct') {
@@ -1685,7 +1676,6 @@
       sorted = pool.filter(t => t.winPct != null && t.marketsTraded >= 1).sort((a, b) => b.winPct - a.winPct).slice(0, 20);
       // If too few have data, fall back to showing all by PnL so chart isn't nearly empty
       if (sorted.length < 5) sorted = pool.sort((a, b) => b.pnl - a.pnl).slice(0, 20);
-      chartLabel = 'Win %';
       chartMode = 'winPct';
     } else if (currentSort === 'vol') {
       sorted = pool.sort((a, b) => b.vol - a.vol).slice(0, 20);
