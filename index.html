@@ -667,6 +667,26 @@
   .fav-pill:hover { background: rgba(251, 191, 36, 0.22); border-color: #fbbf24; }
   .fav-pill.has-favs { background: rgba(251, 191, 36, 0.18); }
 
+  /* Hidden pill button */
+  .hidden-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: var(--text-secondary);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+  .hidden-pill:hover { background: rgba(148, 163, 184, 0.16); border-color: var(--text-secondary); color: var(--text-primary); }
+  .hidden-pill.has-hidden { background: rgba(148, 163, 184, 0.12); border-color: rgba(148, 163, 184, 0.45); }
+
   /* Favorites modal */
   .fav-modal-grid {
     display: flex;
@@ -1008,9 +1028,7 @@
         <button class="table-tab" data-sort="combo">Combined</button>
       </div>
       <button class="fav-pill" id="favPillBtn" title="View your starred traders">⭐ <span id="favCount">0</span></button>
-      <div id="hiddenBanner" style="display:none;font-size:12px;color:var(--text-secondary);margin-left:8px;align-self:center">
-        <span id="hiddenCount"></span> hidden · <a href="#" id="clearHiddenLink" style="color:var(--accent-blue);text-decoration:none">Manage</a>
-      </div>
+      <button class="hidden-pill" id="hiddenPillBtn" title="View hidden traders" style="display:none">👁 <span id="hiddenCount">0</span></button>
     </div>
     <div class="sort-combo" id="sortComboPanel" style="display:none">
       <span style="font-size:12px;color:var(--text-secondary);margin-right:4px">Rank by (click to toggle, order matters):</span>
@@ -1053,6 +1071,19 @@
     </div>
     <div class="modal-body" id="favModalBody">
       <div class="fav-modal-empty">No favorites yet.<br>Click ★ on any trader to add them here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden traders modal -->
+<div class="modal-overlay" id="hiddenModal">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header">
+      <h3>👁 Hidden Traders</h3>
+      <button class="modal-close" id="hiddenModalClose">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="hiddenModalBody">
+      <div class="fav-modal-empty">No hidden traders.</div>
     </div>
   </div>
 </div>
@@ -1113,7 +1144,67 @@
   function hideTrader(wallet) {
     hiddenTraders.add(wallet);
     saveHidden();
+    updateHiddenPill();
     renderTable();
+  }
+
+  function unhideTrader(wallet) {
+    hiddenTraders.delete(wallet);
+    saveHidden();
+    updateHiddenPill();
+    renderTable();
+    if (document.getElementById('hiddenModal').classList.contains('open')) {
+      renderHiddenModal();
+    }
+  }
+
+  function updateHiddenPill() {
+    const pill = document.getElementById('hiddenPillBtn');
+    const countEl = document.getElementById('hiddenCount');
+    if (!pill || !countEl) return;
+    countEl.textContent = hiddenTraders.size;
+    pill.style.display = hiddenTraders.size > 0 ? 'inline-flex' : 'none';
+    pill.classList.toggle('has-hidden', hiddenTraders.size > 0);
+    pill.title = hiddenTraders.size > 0
+      ? `View ${hiddenTraders.size} hidden trader${hiddenTraders.size === 1 ? '' : 's'}`
+      : '';
+  }
+
+  function renderHiddenModal() {
+    const body = document.getElementById('hiddenModalBody');
+    if (!body) return;
+    if (hiddenTraders.size === 0) {
+      body.innerHTML = `<div class="fav-modal-empty">No hidden traders.</div>`;
+      return;
+    }
+    // Match hidden wallets to currentData if available, otherwise show wallet address
+    const hiddenList = [...hiddenTraders].map(wallet => {
+      const trader = currentData ? currentData.find(t => t.proxyWallet === wallet) : null;
+      return { wallet, trader };
+    });
+    body.innerHTML = `<div class="fav-modal-grid">${hiddenList.map(({ wallet, trader }) => {
+      const name = trader
+        ? (trader.userName || shortenAddr(wallet))
+        : shortenAddr(wallet);
+      const profileUrl = `https://polymarket.com/profile/${wallet}`;
+      const pnlColor = trader && (trader.pnl || 0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+      return `<div class="fav-modal-row">
+        <div class="fav-modal-name" title="${name}">
+          <a href="${profileUrl}" target="_blank" style="color:var(--text-secondary);text-decoration:none">${name}</a>
+        </div>
+        ${trader ? `<div class="fav-modal-stats">
+          <div class="fav-modal-stat">
+            <div class="label">PnL</div>
+            <div class="val" style="color:${pnlColor}">${formatUSD(trader.pnl)}</div>
+          </div>
+          ${trader.winPct != null ? `<div class="fav-modal-stat">
+            <div class="label">Win%</div>
+            <div class="val">${trader.winPct.toFixed(1)}%</div>
+          </div>` : ''}
+        </div>` : ''}
+        <button class="fav-modal-unstar" style="color:var(--text-secondary)" title="Unhide this trader" onclick="unhideTrader('${wallet}')">👁</button>
+      </div>`;
+    }).join('')}</div>`;
   }
 
   function updateFavPill() {
@@ -1291,20 +1382,21 @@
       if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
     });
 
-    // Manage hidden link → show a small modal-like confirm
-    document.getElementById('clearHiddenLink').addEventListener('click', e => {
-      e.preventDefault();
-      const names = [...hiddenTraders];
-      if (names.length === 0) return;
-      if (confirm(`Unhide all ${names.length} hidden trader(s)?`)) {
-        hiddenTraders.clear();
-        saveHidden();
-        renderTable();
-      }
+    // Hidden pill → open hidden modal
+    document.getElementById('hiddenPillBtn').addEventListener('click', () => {
+      renderHiddenModal();
+      document.getElementById('hiddenModal').classList.add('open');
+    });
+    document.getElementById('hiddenModalClose').addEventListener('click', () => {
+      document.getElementById('hiddenModal').classList.remove('open');
+    });
+    document.getElementById('hiddenModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
     });
 
-    // Init fav pill label
+    // Init pill labels
     updateFavPill();
+    updateHiddenPill();
 
     // Column header clicks → sort table (and sync with tab buttons where possible)
     const colToSort = { pnl: 'pnl', vol: 'vol', winPct: 'winPct', wins: 'wins', roi: 'roi', markets: 'markets' };
@@ -1915,15 +2007,6 @@
     // Exclude hidden traders
     data = data.filter(t => !hiddenTraders.has(t.proxyWallet));
 
-    // Update hidden banner
-    const hiddenBanner = document.getElementById('hiddenBanner');
-    const hiddenCount  = document.getElementById('hiddenCount');
-    if (hiddenTraders.size > 0) {
-      hiddenBanner.style.display = 'flex';
-      hiddenCount.textContent = hiddenTraders.size + (hiddenTraders.size === 1 ? ' trader' : ' traders');
-    } else {
-      hiddenBanner.style.display = 'none';
-    }
 
     if (search) {
       data = data.filter(t =>
