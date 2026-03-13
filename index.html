@@ -1133,11 +1133,13 @@
     });
 
     document.querySelectorAll('#rankingTabs .table-tab').forEach(tab => {
+      if (tab.id === 'favTabBtn') return; // favorites tab has its own handler below
       tab.addEventListener('click', () => {
+        // Clicking any sort tab always exits favorites-only view
+        showFavoritesOnly = false;
         document.querySelectorAll('#rankingTabs .table-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         currentSort = tab.dataset.sort;
-        // Show/hide combo panel
         document.getElementById('sortComboPanel').style.display = currentSort === 'combo' ? 'flex' : 'none';
         renderTable();
         renderCharts();
@@ -1214,9 +1216,10 @@
       th.style.cursor = 'pointer';
       th.addEventListener('click', () => {
         currentSort = colToSort[col];
+        showFavoritesOnly = false; // exit favorites view when clicking a column header
         // Sync tab button highlight if a matching tab exists
         document.querySelectorAll('#rankingTabs .table-tab').forEach(t => {
-          t.classList.toggle('active', t.dataset.sort === currentSort);
+          t.classList.toggle('active', t.dataset.sort === currentSort && t.id !== 'favTabBtn');
         });
         // Hide combo panel
         document.getElementById('sortComboPanel').style.display = 'none';
