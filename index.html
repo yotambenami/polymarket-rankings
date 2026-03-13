@@ -613,6 +613,43 @@
   }
   .trades-btn:hover { background: rgba(99,179,237,0.25); }
 
+  /* Star (favorite) button */
+  .fav-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    padding: 2px 4px;
+    margin-left: 4px;
+    border-radius: 4px;
+    transition: opacity 0.15s, color 0.15s;
+    vertical-align: middle;
+  }
+  .fav-icon-btn:hover, .fav-icon-btn.fav-active {
+    opacity: 1;
+    color: #f59e0b;
+  }
+
+  /* Hide (eye) button */
+  .hide-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.3;
+    padding: 2px 4px;
+    margin-left: 2px;
+    border-radius: 4px;
+    transition: opacity 0.15s;
+    vertical-align: middle;
+  }
+  .hide-icon-btn:hover { opacity: 0.9; }
+
+  /* Favorites tab styling */
+  .fav-tab { border-left: 1px solid var(--border-color) !important; margin-left: 4px !important; }
+
   .modal-overlay {
     display: none;
     position: fixed;
@@ -920,6 +957,10 @@
         <button class="table-tab" data-sort="vol">By Volume</button>
         <button class="table-tab" data-sort="roi">By ROI %</button>
         <button class="table-tab" data-sort="combo">Combined</button>
+        <button class="table-tab fav-tab" id="favTabBtn" data-sort="favorites">⭐ Favorites</button>
+      </div>
+      <div id="hiddenBanner" style="display:none;font-size:12px;color:var(--text-secondary);margin-left:auto;align-self:center">
+        <span id="hiddenCount"></span> hidden · <a href="#" id="clearHiddenLink" style="color:var(--accent-blue);text-decoration:none">Manage</a>
       </div>
     </div>
     <div class="sort-combo" id="sortComboPanel" style="display:none">
@@ -987,6 +1028,35 @@
   let profileCache = new Map();  // key = "address|timePeriod"
   let lastEnrichedPeriod = null;  // track which period was last enriched
   let fetchSeq = 0;  // incremented each fetchData() call; stale calls self-abort
+
+  // --- Favorites & Hidden (persisted to localStorage) ---
+  let favorites   = new Set(JSON.parse(localStorage.getItem('pmFavorites') || '[]'));
+  let hiddenTraders = new Set(JSON.parse(localStorage.getItem('pmHidden')    || '[]'));
+  let showFavoritesOnly = false;
+
+  function saveFavorites() { localStorage.setItem('pmFavorites', JSON.stringify([...favorites])); }
+  function saveHidden()    { localStorage.setItem('pmHidden',    JSON.stringify([...hiddenTraders])); }
+
+  function toggleFavorite(wallet) {
+    if (favorites.has(wallet)) favorites.delete(wallet);
+    else favorites.add(wallet);
+    saveFavorites();
+    renderTable();
+    updateFavTab();
+  }
+
+  function hideTrader(wallet) {
+    hiddenTraders.add(wallet);
+    saveHidden();
+    // If we were showing this trader in favorites, stay in fav view; otherwise re-render
+    renderTable();
+  }
+
+  function updateFavTab() {
+    const btn = document.getElementById('favTabBtn');
+    if (!btn) return;
+    btn.textContent = favorites.size > 0 ? `⭐ Favorites (${favorites.size})` : '⭐ Favorites';
+  }
 
   // --- Formatting helpers ---
   function formatUSD(val) {
@@ -1104,6 +1174,37 @@
     });
 
     document.getElementById('searchBox').addEventListener('input', () => renderTable());
+
+    // Favorites tab
+    document.getElementById('favTabBtn').addEventListener('click', () => {
+      showFavoritesOnly = !showFavoritesOnly;
+      document.getElementById('favTabBtn').classList.toggle('active', showFavoritesOnly);
+      // Deactivate other sort tabs when entering favorites view
+      if (showFavoritesOnly) {
+        document.querySelectorAll('#rankingTabs .table-tab:not(#favTabBtn)').forEach(t => t.classList.remove('active'));
+      } else {
+        // Restore the previously active sort tab
+        document.querySelectorAll('#rankingTabs .table-tab').forEach(t => {
+          t.classList.toggle('active', t.dataset.sort === currentSort);
+        });
+      }
+      renderTable();
+    });
+
+    // Manage hidden link → show a small modal-like confirm
+    document.getElementById('clearHiddenLink').addEventListener('click', e => {
+      e.preventDefault();
+      const names = [...hiddenTraders];
+      if (names.length === 0) return;
+      if (confirm(`Unhide all ${names.length} hidden trader(s)?`)) {
+        hiddenTraders.clear();
+        saveHidden();
+        renderTable();
+      }
+    });
+
+    // Init fav tab label
+    updateFavTab();
 
     // Column header clicks → sort table (and sync with tab buttons where possible)
     const colToSort = { pnl: 'pnl', vol: 'vol', winPct: 'winPct', wins: 'wins', roi: 'roi', markets: 'markets' };
@@ -1714,6 +1815,24 @@
     const search = document.getElementById('searchBox').value.toLowerCase();
     let data = [...currentData];
 
+    // Favorites-only view
+    if (showFavoritesOnly) {
+      data = data.filter(t => favorites.has(t.proxyWallet));
+    } else {
+      // Normal view: exclude hidden traders
+      data = data.filter(t => !hiddenTraders.has(t.proxyWallet));
+    }
+
+    // Update hidden banner
+    const hiddenBanner = document.getElementById('hiddenBanner');
+    const hiddenCount  = document.getElementById('hiddenCount');
+    if (hiddenTraders.size > 0 && !showFavoritesOnly) {
+      hiddenBanner.style.display = 'flex';
+      hiddenCount.textContent = hiddenTraders.size + (hiddenTraders.size === 1 ? ' trader' : ' traders');
+    } else {
+      hiddenBanner.style.display = 'none';
+    }
+
     if (search) {
       data = data.filter(t =>
         (t.userName && t.userName.toLowerCase().includes(search)) ||
@@ -1804,7 +1923,10 @@
     const tbody = document.getElementById('tableBody');
 
     if (data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">No traders match the current filters.</td></tr>';
+      const emptyMsg = showFavoritesOnly
+        ? 'No favorites yet — click ★ on any trader to add them here.'
+        : 'No traders match the current filters.';
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">${emptyMsg}</td></tr>`;
       return;
     }
 
@@ -1882,6 +2004,8 @@
         <td style="white-space:nowrap">
           <button class="trades-btn" onclick="openTradesModal('${t.proxyWallet}','${name.replace(/'/g,"\\'")}')">Trades</button>
           <a href="${profileUrl}" target="_blank" class="polymarket-link" style="margin-left:8px">View &#8599;</a>
+          <button class="fav-icon-btn${favorites.has(t.proxyWallet) ? ' fav-active' : ''}" title="${favorites.has(t.proxyWallet) ? 'Remove from favorites' : 'Add to favorites'}" onclick="toggleFavorite('${t.proxyWallet}')">&#9733;</button>
+          <button class="hide-icon-btn" title="Hide this trader" onclick="hideTrader('${t.proxyWallet}')">&#128065;&#65039;</button>
         </td>
       </tr>`;
     }).join('');
