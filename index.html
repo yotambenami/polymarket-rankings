@@ -647,8 +647,57 @@
   }
   .hide-icon-btn:hover { opacity: 0.9; }
 
-  /* Favorites tab styling */
-  .fav-tab { border-left: 1px solid var(--border-color) !important; margin-left: 4px !important; }
+  /* Favorites pill button (in table header) */
+  .fav-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: #fbbf24;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .fav-pill:hover { background: rgba(251, 191, 36, 0.22); border-color: #fbbf24; }
+  .fav-pill.has-favs { background: rgba(251, 191, 36, 0.18); }
+
+  /* Favorites modal */
+  .fav-modal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+  }
+  .fav-modal-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+  .fav-modal-rank { font-size: 12px; color: var(--text-secondary); min-width: 24px; }
+  .fav-modal-name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav-modal-stats { display: flex; gap: 14px; font-size: 13px; }
+  .fav-modal-stat { text-align: right; }
+  .fav-modal-stat .label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .fav-modal-stat .val { font-weight: 700; }
+  .fav-modal-unstar {
+    background: none; border: none; color: #fbbf24; font-size: 18px;
+    cursor: pointer; padding: 2px 6px; opacity: 0.7; transition: opacity 0.15s;
+  }
+  .fav-modal-unstar:hover { opacity: 1; }
+  .fav-modal-empty {
+    text-align: center; padding: 40px 20px;
+    color: var(--text-secondary); font-size: 14px; line-height: 1.6;
+  }
 
   .modal-overlay {
     display: none;
@@ -957,9 +1006,9 @@
         <button class="table-tab" data-sort="vol">By Volume</button>
         <button class="table-tab" data-sort="roi">By ROI %</button>
         <button class="table-tab" data-sort="combo">Combined</button>
-        <button class="table-tab fav-tab" id="favTabBtn" data-sort="favorites">⭐ Favorites</button>
       </div>
-      <div id="hiddenBanner" style="display:none;font-size:12px;color:var(--text-secondary);margin-left:auto;align-self:center">
+      <button class="fav-pill" id="favPillBtn" title="View your starred traders">⭐ <span id="favCount">0</span></button>
+      <div id="hiddenBanner" style="display:none;font-size:12px;color:var(--text-secondary);margin-left:8px;align-self:center">
         <span id="hiddenCount"></span> hidden · <a href="#" id="clearHiddenLink" style="color:var(--accent-blue);text-decoration:none">Manage</a>
       </div>
     </div>
@@ -991,6 +1040,19 @@
           <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">Loading data...</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Favorites modal -->
+<div class="modal-overlay" id="favoritesModal">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header">
+      <h3>⭐ Favorites</h3>
+      <button class="modal-close" id="favModalClose">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="favModalBody">
+      <div class="fav-modal-empty">No favorites yet.<br>Click ★ on any trader to add them here.</div>
     </div>
   </div>
 </div>
@@ -1032,7 +1094,6 @@
   // --- Favorites & Hidden (persisted to localStorage) ---
   let favorites   = new Set(JSON.parse(localStorage.getItem('pmFavorites') || '[]'));
   let hiddenTraders = new Set(JSON.parse(localStorage.getItem('pmHidden')    || '[]'));
-  let showFavoritesOnly = false;
 
   function saveFavorites() { localStorage.setItem('pmFavorites', JSON.stringify([...favorites])); }
   function saveHidden()    { localStorage.setItem('pmHidden',    JSON.stringify([...hiddenTraders])); }
@@ -1041,21 +1102,65 @@
     if (favorites.has(wallet)) favorites.delete(wallet);
     else favorites.add(wallet);
     saveFavorites();
+    updateFavPill();
     renderTable();
-    updateFavTab();
+    // If favorites modal is open, refresh it live
+    if (document.getElementById('favoritesModal').classList.contains('open')) {
+      renderFavoritesModal();
+    }
   }
 
   function hideTrader(wallet) {
     hiddenTraders.add(wallet);
     saveHidden();
-    // If we were showing this trader in favorites, stay in fav view; otherwise re-render
     renderTable();
   }
 
-  function updateFavTab() {
-    const btn = document.getElementById('favTabBtn');
-    if (!btn) return;
-    btn.textContent = favorites.size > 0 ? `⭐ Favorites (${favorites.size})` : '⭐ Favorites';
+  function updateFavPill() {
+    const pill = document.getElementById('favPillBtn');
+    const countEl = document.getElementById('favCount');
+    if (!pill || !countEl) return;
+    countEl.textContent = favorites.size;
+    pill.classList.toggle('has-favs', favorites.size > 0);
+    pill.title = favorites.size > 0 ? `View ${favorites.size} starred trader${favorites.size === 1 ? '' : 's'}` : 'No favorites yet — click ★ on any trader';
+  }
+
+  function renderFavoritesModal() {
+    const body = document.getElementById('favModalBody');
+    if (!body) return;
+    const favList = currentData ? currentData.filter(t => favorites.has(t.proxyWallet)) : [];
+    if (favList.length === 0) {
+      body.innerHTML = `<div class="fav-modal-empty">No favorites yet.<br>Click ★ on any trader to add them here.</div>`;
+      return;
+    }
+    // Sort by PnL descending
+    favList.sort((a, b) => (b.pnl || 0) - (a.pnl || 0));
+    body.innerHTML = `<div class="fav-modal-grid">${favList.map((t, i) => {
+      const name = t.userName || shortenAddr(t.proxyWallet);
+      const profileUrl = `https://polymarket.com/profile/${t.proxyWallet}`;
+      const pnlColor = (t.pnl || 0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+      return `<div class="fav-modal-row">
+        <span class="fav-modal-rank">#${i+1}</span>
+        <div class="fav-modal-name" title="${name}">
+          <a href="${profileUrl}" target="_blank" style="color:var(--text-primary);text-decoration:none">${name}</a>
+        </div>
+        <div class="fav-modal-stats">
+          <div class="fav-modal-stat">
+            <div class="label">PnL</div>
+            <div class="val" style="color:${pnlColor}">${formatUSD(t.pnl)}</div>
+          </div>
+          ${t.winPct != null ? `<div class="fav-modal-stat">
+            <div class="label">Win%</div>
+            <div class="val">${t.winPct.toFixed(1)}%</div>
+          </div>` : ''}
+          ${t.roi != null ? `<div class="fav-modal-stat">
+            <div class="label">ROI</div>
+            <div class="val" style="color:${(t.roi||0)>=0?'var(--accent-green)':'var(--accent-red)'}">${t.roi.toFixed(1)}%</div>
+          </div>` : ''}
+        </div>
+        <button class="fav-modal-unstar" title="Remove from favorites" onclick="toggleFavorite('${t.proxyWallet}')">★</button>
+      </div>`;
+    }).join('')}</div>`;
   }
 
   // --- Formatting helpers ---
@@ -1133,10 +1238,7 @@
     });
 
     document.querySelectorAll('#rankingTabs .table-tab').forEach(tab => {
-      if (tab.id === 'favTabBtn') return; // favorites tab has its own handler below
       tab.addEventListener('click', () => {
-        // Clicking any sort tab always exits favorites-only view
-        showFavoritesOnly = false;
         document.querySelectorAll('#rankingTabs .table-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         currentSort = tab.dataset.sort;
@@ -1177,13 +1279,16 @@
 
     document.getElementById('searchBox').addEventListener('input', () => renderTable());
 
-    // Favorites tab — proper tab (not a toggle)
-    document.getElementById('favTabBtn').addEventListener('click', () => {
-      showFavoritesOnly = true;
-      document.querySelectorAll('#rankingTabs .table-tab').forEach(t => t.classList.remove('active'));
-      document.getElementById('favTabBtn').classList.add('active');
-      document.getElementById('sortComboPanel').style.display = 'none';
-      renderTable();
+    // Favorites pill → open favorites modal
+    document.getElementById('favPillBtn').addEventListener('click', () => {
+      renderFavoritesModal();
+      document.getElementById('favoritesModal').classList.add('open');
+    });
+    document.getElementById('favModalClose').addEventListener('click', () => {
+      document.getElementById('favoritesModal').classList.remove('open');
+    });
+    document.getElementById('favoritesModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
     });
 
     // Manage hidden link → show a small modal-like confirm
@@ -1198,8 +1303,8 @@
       }
     });
 
-    // Init fav tab label
-    updateFavTab();
+    // Init fav pill label
+    updateFavPill();
 
     // Column header clicks → sort table (and sync with tab buttons where possible)
     const colToSort = { pnl: 'pnl', vol: 'vol', winPct: 'winPct', wins: 'wins', roi: 'roi', markets: 'markets' };
@@ -1209,10 +1314,9 @@
       th.style.cursor = 'pointer';
       th.addEventListener('click', () => {
         currentSort = colToSort[col];
-        showFavoritesOnly = false; // exit favorites view when clicking a column header
         // Sync tab button highlight if a matching tab exists
         document.querySelectorAll('#rankingTabs .table-tab').forEach(t => {
-          t.classList.toggle('active', t.dataset.sort === currentSort && t.id !== 'favTabBtn');
+          t.classList.toggle('active', t.dataset.sort === currentSort);
         });
         // Hide combo panel
         document.getElementById('sortComboPanel').style.display = 'none';
@@ -1808,18 +1912,13 @@
     const search = document.getElementById('searchBox').value.toLowerCase();
     let data = [...currentData];
 
-    // Favorites-only view
-    if (showFavoritesOnly) {
-      data = data.filter(t => favorites.has(t.proxyWallet));
-    } else {
-      // Normal view: exclude hidden traders
-      data = data.filter(t => !hiddenTraders.has(t.proxyWallet));
-    }
+    // Exclude hidden traders
+    data = data.filter(t => !hiddenTraders.has(t.proxyWallet));
 
     // Update hidden banner
     const hiddenBanner = document.getElementById('hiddenBanner');
     const hiddenCount  = document.getElementById('hiddenCount');
-    if (hiddenTraders.size > 0 && !showFavoritesOnly) {
+    if (hiddenTraders.size > 0) {
       hiddenBanner.style.display = 'flex';
       hiddenCount.textContent = hiddenTraders.size + (hiddenTraders.size === 1 ? ' trader' : ' traders');
     } else {
@@ -1916,10 +2015,7 @@
     const tbody = document.getElementById('tableBody');
 
     if (data.length === 0) {
-      const emptyMsg = showFavoritesOnly
-        ? 'No favorites yet — click ★ on any trader to add them here.'
-        : 'No traders match the current filters.';
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">${emptyMsg}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-secondary)">No traders match the current filters.</td></tr>`;
       return;
     }
 
